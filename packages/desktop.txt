@@ -1,2 +1,3 @@
 fuzzel firefox
 hyprlock hypridle mako swaybg
+yazi bluez bluez-utils bluetui
