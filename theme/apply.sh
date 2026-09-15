@@ -13,7 +13,7 @@ CONF
   echo "font=JetBrainsMono Nerd Font:size=11"
   echo "pad=8x8"
   echo
-  echo "[colors]"
+  echo "[colors-dark]"
   echo "background=$BG"
   echo "foreground=$FG"
   for i in {0..7};  do echo "regular$i=${ANSI[$i]}"; done
