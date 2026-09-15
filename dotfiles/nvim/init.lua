@@ -16,6 +16,7 @@ o.scrolloff = 8
 o.splitright = true
 o.splitbelow = true
 o.completeopt = { "menu", "menuone", "noselect" }
+o.timeoutlen = 400
 
 -- lazy.nvim bootstrap
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -40,6 +41,14 @@ require("lazy").setup({
       })
     end },
   { "neovim/nvim-lspconfig" },
+  { "folke/which-key.nvim", event = "VeryLazy",
+    opts = {
+      spec = {
+        { "<leader>f", group = "find" },
+        { "<leader>c", group = "code" },
+        { "<leader>r", group = "refactor" },
+      },
+    } },
 })
 
 -- LSP
@@ -51,11 +60,15 @@ vim.api.nvim_create_autocmd("LspAttach", {
     if client and client:supports_method("textDocument/completion") then
       vim.lsp.completion.enable(true, client.id, ev.buf, { autotrigger = true })
     end
-    local map = function(keys, fn) vim.keymap.set("n", keys, fn, { buffer = ev.buf }) end
-    map("gd", vim.lsp.buf.definition)
-    map("gr", vim.lsp.buf.references)
-    map("<leader>rn", vim.lsp.buf.rename)
-    map("<leader>ca", vim.lsp.buf.code_action)
+    local map = function(keys, fn, desc)
+      vim.keymap.set("n", keys, fn, { buffer = ev.buf, desc = desc })
+    end
+    map("gd", vim.lsp.buf.definition, "Go to definition")
+    map("gr", vim.lsp.buf.references, "References")
+    map("K", vim.lsp.buf.hover, "Hover docs")
+    map("<leader>rn", vim.lsp.buf.rename, "Rename symbol")
+    map("<leader>ca", vim.lsp.buf.code_action, "Code action")
+    map("<leader>cd", vim.diagnostic.open_float, "Line diagnostics")
   end,
 })
 
@@ -66,10 +79,16 @@ vim.api.nvim_create_autocmd("BufWritePre", {
 })
 
 -- keymaps
-local map = vim.keymap.set
-map("n", "<leader>ff", "<cmd>Telescope find_files<cr>")
-map("n", "<leader>fg", "<cmd>Telescope live_grep<cr>")
-map("n", "<leader>fb", "<cmd>Telescope buffers<cr>")
-map("n", "<leader>w", "<cmd>w<cr>")
-map("n", "<leader>q", "<cmd>q<cr>")
-map("n", "<Esc>", "<cmd>nohlsearch<cr>")
+local map = function(keys, fn, desc)
+  vim.keymap.set("n", keys, fn, { desc = desc })
+end
+map("<leader>ff", "<cmd>Telescope find_files<cr>", "Files")
+map("<leader>fg", "<cmd>Telescope live_grep<cr>", "Grep")
+map("<leader>fb", "<cmd>Telescope buffers<cr>", "Buffers")
+map("<leader>fr", "<cmd>Telescope oldfiles<cr>", "Recent files")
+map("<leader>fh", "<cmd>Telescope help_tags<cr>", "Help")
+map("<leader>w", "<cmd>w<cr>", "Save")
+map("<leader>q", "<cmd>q<cr>", "Quit")
+map("<leader>e", "<cmd>Explore<cr>", "File explorer")
+map("<leader>?", "<cmd>WhichKey<cr>", "All keymaps")
+map("<Esc>", "<cmd>nohlsearch<cr>", "Clear search")
