@@ -4,3 +4,4 @@ Bar 1.0 Bar.qml
 Launcher 1.0 Launcher.qml
 singleton Stats 1.0 Stats.qml
 Dashboard 1.0 Dashboard.qml
+singleton Weather 1.0 Weather.qml

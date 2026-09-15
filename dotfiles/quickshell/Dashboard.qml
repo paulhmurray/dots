@@ -1,7 +1,9 @@
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Bluetooth
 import Quickshell.Services.UPower
+import Quickshell.Services.Mpris
 import QtQuick
 import QtQuick.Controls
 
@@ -9,7 +11,7 @@ PanelWindow {
     id: win
     visible: false
     implicitWidth: 780
-    implicitHeight: 460
+    implicitHeight: 540
     exclusiveZone: 0
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -21,6 +23,9 @@ PanelWindow {
     }
 
     SystemClock { id: clock; precision: SystemClock.Minutes }
+
+    property var player: Mpris.players.values.find(p => p.isPlaying)
+        ?? Mpris.players.values[0] ?? null
 
     component Txt: Text {
         color: Colours.fg
@@ -54,6 +59,28 @@ PanelWindow {
                 color: value > 0.85 ? Colours.red : Colours.accent
                 Behavior on width { NumberAnimation { duration: 300 } }
             }
+        }
+    }
+
+    component IconButton: Rectangle {
+        property string icon
+        property var action
+        property bool active: true
+        width: 36; height: 36; radius: 8
+        color: hover.containsMouse && active ? Colours.accent : Colours.surface
+        opacity: active ? 1 : 0.4
+        Text {
+            anchors.centerIn: parent
+            text: icon
+            color: hover.containsMouse && active ? Colours.bg : Colours.fg
+            font.family: Colours.font
+            font.pixelSize: 16
+        }
+        MouseArea {
+            id: hover
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: if (active) action()
         }
     }
 
@@ -93,34 +120,19 @@ PanelWindow {
                             ["󰜉", "systemctl reboot"],
                             ["󰐥", "systemctl poweroff"]
                         ]
-                        Rectangle {
+                        IconButton {
                             required property var modelData
-                            width: 36; height: 36; radius: 8
-                            color: hover.containsMouse ? Colours.accent : Colours.surface
-                            Text {
-                                anchors.centerIn: parent
-                                text: modelData[0]
-                                color: hover.containsMouse ? Colours.bg : Colours.fg
-                                font.family: Colours.font
-                                font.pixelSize: 16
-                            }
-                            MouseArea {
-                                id: hover
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onClicked: {
-                                    win.visible = false;
-                                    Quickshell.execDetached(["sh", "-c", modelData[1]]);
-                                }
-                            }
+                            icon: modelData[0]
+                            action: () => { win.visible = false; Quickshell.execDetached(["sh", "-c", modelData[1]]); }
                         }
                     }
                 }
             }
 
+            // cards
             Row {
                 width: parent.width
-                height: parent.height - 52
+                height: parent.height - 40 - 72 - 24
                 spacing: 12
 
                 Card {
@@ -171,12 +183,86 @@ PanelWindow {
                     height: parent.height
                     Column {
                         anchors.fill: parent
-                        spacing: 10
-                        Txt { text: (Network.connected ? "󰖩  " + Network.ssid : "󰖪  offline") }
-                        Txt { text: "󰂯  bluetooth — stage 2"; color: Colours.dim }
-                        Txt { text: "󰝚  media — stage 2"; color: Colours.dim }
-                        Txt { text: "󰖙  weather — stage 2"; color: Colours.dim }
+                        spacing: 12
+
+                        Txt {
+                            text: Network.connected ? "󰖩  " + Network.ssid : "󰖪  offline"
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: { win.visible = false; Quickshell.execDetached(["foot", "-e", "nmtui"]); }
+                            }
+                        }
+
+                        Txt {
+                            property var adapter: Bluetooth.defaultAdapter
+                            property var connected: Bluetooth.devices.values.filter(d => d.connected)
+                            text: !adapter || !adapter.enabled ? "󰂲  bluetooth off"
+                                : connected.length > 0 ? "󰂱  " + connected.map(d => d.name).join(", ")
+                                : "󰂯  bluetooth on"
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: { win.visible = false; Quickshell.execDetached(["foot", "-e", "bluetui"]); }
+                            }
+                        }
+
+                        Txt { text: "󰖙  " + Weather.text }
+                        Txt { text: Weather.location; color: Colours.dim; font.pixelSize: 11 }
                     }
+                }
+            }
+
+            // media strip
+            Rectangle {
+                width: parent.width
+                height: 72
+                radius: 10
+                color: Colours.surface
+
+                Image {
+                    id: art
+                    anchors.left: parent.left
+                    anchors.leftMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 44; height: 44
+                    source: win.player ? win.player.trackArtUrl : ""
+                    visible: status === Image.Ready
+                    fillMode: Image.PreserveAspectCrop
+                }
+
+                Column {
+                    anchors.left: art.visible ? art.right : parent.left
+                    anchors.leftMargin: 14
+                    anchors.right: controls.left
+                    anchors.rightMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 2
+                    Txt {
+                        width: parent.width
+                        elide: Text.ElideRight
+                        font.bold: true
+                        text: win.player ? (win.player.trackTitle || "Unknown title") : "Nothing playing"
+                    }
+                    Txt {
+                        width: parent.width
+                        elide: Text.ElideRight
+                        color: Colours.dim
+                        text: win.player ? win.player.trackArtist : ""
+                    }
+                }
+
+                Row {
+                    id: controls
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 6
+                    IconButton { icon: "󰒮"; active: win.player?.canGoPrevious ?? false
+                                 action: () => win.player.previous() }
+                    IconButton { icon: win.player?.isPlaying ? "󰏤" : "󰐊"
+                                 active: win.player?.canTogglePlaying ?? false
+                                 action: () => win.player.togglePlaying() }
+                    IconButton { icon: "󰒭"; active: win.player?.canGoNext ?? false
+                                 action: () => win.player.next() }
                 }
             }
         }
