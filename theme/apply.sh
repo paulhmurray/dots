@@ -95,3 +95,17 @@ pkill swaybg || true
 setsid swaybg -c "#$BG" >/dev/null 2>&1 &
 makoctl reload 2>/dev/null || true
 echo "theme applied: ${1:-mocha}"
+
+cat > "$DOTS/dotfiles/tmux/colours.conf" << TMUX
+set -g status-style "bg=#$BG_ALT,fg=#$FG"
+set -g status-left-length 30
+set -g status-left "#[bg=#$ACCENT,fg=#$BG,bold]  #S #[bg=#$BG_ALT,fg=#$ACCENT]#[default] "
+set -g status-right "#[fg=#$BLUE] #(cat /etc/hostname)  #[fg=#$GREEN]󰥔 %H:%M #[fg=#$YELLOW]󰃭 %a %d %b "
+set -g window-status-format "#[fg=#$DIM] #I #W "
+set -g window-status-current-format "#[bg=#$SURFACE,fg=#$ACCENT,bold] #I #W #[default]"
+set -g window-status-separator ""
+set -g pane-border-style "fg=#$SURFACE"
+set -g pane-active-border-style "fg=#$ACCENT"
+set -g message-style "bg=#$SURFACE,fg=#$FG"
+TMUX
+tmux source-file ~/.config/tmux/tmux.conf 2>/dev/null || true

@@ -1,3 +1,4 @@
 go fzf ripgrep fd
 gopls lua-language-server
 tree-sitter-cli
+tmux

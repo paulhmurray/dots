@@ -43,6 +43,19 @@ ShellRoot {
                 anchors.leftMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 10
+                MouseArea {
+                    width: logo.width
+                    height: logo.height
+                    anchors.verticalCenter: parent.verticalCenter
+                    onClicked: Quickshell.execDetached(["fuzzel"])
+                    Text {
+                        id: logo
+                        text: "󰣇"
+                        color: Colours.accent
+                        font.family: Colours.font
+                        font.pixelSize: 18
+                    }
+                }
                 Repeater {
                     model: Hyprland.workspaces
                     Text {
