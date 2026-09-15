@@ -39,7 +39,6 @@ Singleton {
     readonly property string blue: "#$BLUE"
 }
 QML
-echo "singleton Colours 1.0 Colours.qml" > "$DOTS/dotfiles/quickshell/qmldir"
 
 cat > "$DOTS/dotfiles/hypr/hyprlock.conf" << LOCK
 general {
