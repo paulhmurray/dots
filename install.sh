@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DOTS="$HOME/dots"
-HOST=$(hostname)
+HOST=$(cat /etc/hostname)
 
 echo "==> Packages (pacman)"
 sudo pacman -S --needed --noconfirm $(cat "$DOTS"/packages/{desktop,system,dev}.txt)
