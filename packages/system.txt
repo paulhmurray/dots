@@ -1,1 +1,2 @@
 snapper snap-pac
+upower
