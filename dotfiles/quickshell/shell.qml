@@ -8,11 +8,6 @@ import QtQuick
 ShellRoot {
     id: root
 
-    property string font: "JetBrainsMono Nerd Font"
-    property string fg: "#cdd6f4"
-    property string dim: "#6c7086"
-    property string accent: "#cba6f7"
-    property string bg: "#1e1e2e"
 
     property string ssid: "offline"
 
@@ -40,7 +35,7 @@ ShellRoot {
             screen: modelData
             anchors { top: true; left: true; right: true }
             implicitHeight: 30
-            color: root.bg
+            color: Colours.bg
 
             // left: workspaces
             Row {
@@ -53,8 +48,8 @@ ShellRoot {
                     Text {
                         required property var modelData
                         text: modelData.id
-                        color: modelData.active ? root.accent : root.dim
-                        font.family: root.font
+                        color: modelData.active ? Colours.accent : Colours.dim
+                        font.family: Colours.font
                         font.pixelSize: 14
                     }
                 }
@@ -64,8 +59,8 @@ ShellRoot {
             Text {
                 anchors.centerIn: parent
                 text: Qt.formatDateTime(clock.date, "ddd d MMM  HH:mm")
-                color: root.fg
-                font.family: root.font
+                color: Colours.fg
+                font.family: Colours.font
                 font.pixelSize: 14
             }
 
@@ -78,8 +73,8 @@ ShellRoot {
 
                 Text {
                     text: "󰖩 " + root.ssid
-                    color: root.fg
-                    font.family: root.font
+                    color: Colours.fg
+                    font.family: Colours.font
                     font.pixelSize: 14
                 }
 
@@ -88,8 +83,8 @@ ShellRoot {
                     text: sink && sink.audio
                         ? (sink.audio.muted ? "󰖁 muted" : "󰕾 " + Math.round(sink.audio.volume * 100) + "%")
                         : "󰖁 --"
-                    color: root.fg
-                    font.family: root.font
+                    color: Colours.fg
+                    font.family: Colours.font
                     font.pixelSize: 14
                 }
 
@@ -97,8 +92,8 @@ ShellRoot {
                     property var bat: UPower.displayDevice
                     property bool charging: bat.state === UPowerDeviceState.Charging
                     text: (charging ? "󰂄 " : "󰁹 ") + Math.round(bat.percentage * 100) + "%"
-                    color: bat.percentage < 0.2 && !charging ? "#f38ba8" : root.fg
-                    font.family: root.font
+                    color: bat.percentage < 0.2 && !charging ? Colours.red : Colours.fg
+                    font.family: Colours.font
                     font.pixelSize: 14
                 }
             }
