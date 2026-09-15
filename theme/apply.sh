@@ -5,6 +5,7 @@ source "$DOTS/theme/${1:-mocha}.sh"
 
 cat > "$DOTS/dotfiles/hypr/colours.conf" << CONF
 \$bg = rgb($BG)
+\$bg_hex = $BG
 \$accent = rgb($ACCENT)
 \$dim = rgb($DIM)
 CONF
@@ -38,10 +39,59 @@ Singleton {
     readonly property string blue: "#$BLUE"
 }
 QML
-
 echo "singleton Colours 1.0 Colours.qml" > "$DOTS/dotfiles/quickshell/qmldir"
+
+cat > "$DOTS/dotfiles/hypr/hyprlock.conf" << LOCK
+general {
+    hide_cursor = true
+}
+
+background {
+    monitor =
+    color = rgb($BG)
+}
+
+label {
+    monitor =
+    text = \$TIME
+    color = rgb($FG)
+    font_size = 48
+    font_family = JetBrainsMono Nerd Font
+    position = 0, 80
+    halign = center
+    valign = center
+}
+
+input-field {
+    monitor =
+    size = 250, 50
+    position = 0, -20
+    halign = center
+    valign = center
+    outer_color = rgb($ACCENT)
+    inner_color = rgb($SURFACE)
+    font_color = rgb($FG)
+    placeholder_text = <i>password</i>
+}
+LOCK
+
+mkdir -p "$DOTS/dotfiles/mako"
+cat > "$DOTS/dotfiles/mako/config" << MAKO
+font=JetBrainsMono Nerd Font 11
+background-color=#$BG
+text-color=#$FG
+border-color=#$ACCENT
+border-size=2
+border-radius=6
+default-timeout=5000
+anchor=top-right
+margin=10
+MAKO
 
 hyprctl reload >/dev/null 2>&1 || true
 pkill quickshell || true
 setsid quickshell >/dev/null 2>&1 &
+pkill swaybg || true
+setsid swaybg -c "#$BG" >/dev/null 2>&1 &
+makoctl reload 2>/dev/null || true
 echo "theme applied: ${1:-mocha}"

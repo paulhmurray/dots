@@ -1,1 +1,2 @@
 fuzzel firefox
+hyprlock hypridle mako swaybg
