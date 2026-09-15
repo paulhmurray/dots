@@ -3,7 +3,7 @@ set -euo pipefail
 DOTS="$HOME/dots"
 
 echo "==> Packages (pacman)"
-sudo pacman -S --needed --noconfirm $(cat "$DOTS"/packages/{desktop,system}.txt)
+sudo pacman -S --needed --noconfirm $(cat "$DOTS"/packages/{desktop,system,dev}.txt)
 
 echo "==> AUR helper"
 if ! command -v yay >/dev/null; then
