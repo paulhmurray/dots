@@ -1,3 +1,6 @@
 singleton Colours 1.0 Colours.qml
 singleton Network 1.0 Network.qml
 Bar 1.0 Bar.qml
+Launcher 1.0 Launcher.qml
+singleton Stats 1.0 Stats.qml
+Dashboard 1.0 Dashboard.qml

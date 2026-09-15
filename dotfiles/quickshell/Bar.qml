@@ -22,7 +22,7 @@ PanelWindow {
         MouseArea {
             width: 24; height: 24
             anchors.horizontalCenter: parent.horizontalCenter
-            onClicked: Quickshell.execDetached(["fuzzel"])
+            onClicked: Quickshell.execDetached(["qs", "ipc", "call", "launcher", "toggle"])
             Text {
                 anchors.centerIn: parent
                 text: "󰣇"
