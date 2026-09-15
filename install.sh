@@ -24,6 +24,14 @@ for dir in "$DOTS"/dotfiles/*/; do
     echo "    linked $name"
 done
 
+echo "==> Home files"
+for f in "$DOTS"/home/.[!.]*; do
+    name=$(basename "$f")
+    rm -f "$HOME/$name"
+    ln -sfn "$f" "$HOME/$name"
+    echo "    linked $name"
+done
+
 echo "==> System scripts"
 for s in "$DOTS"/scripts/*.sh; do "$s"; done
 
