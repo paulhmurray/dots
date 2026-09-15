@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DOTS="$HOME/dots"
+HOST=$(hostname)
 
 echo "==> Packages (pacman)"
 sudo pacman -S --needed --noconfirm $(cat "$DOTS"/packages/{desktop,system,dev}.txt)
@@ -14,6 +15,18 @@ fi
 
 echo "==> Packages (AUR)"
 yay -S --needed --noconfirm $(cat "$DOTS"/packages/aur.txt)
+
+echo "==> Host: $HOST"
+if [ -d "$DOTS/hosts/$HOST" ]; then
+    [ -f "$DOTS/hosts/$HOST/packages.txt" ] && \
+        sudo pacman -S --needed --noconfirm $(cat "$DOTS/hosts/$HOST/packages.txt")
+    [ -f "$DOTS/hosts/$HOST/hyprland.conf" ] && \
+        ln -sfn "$DOTS/hosts/$HOST/hyprland.conf" "$DOTS/dotfiles/hypr/host.conf"
+    [ -x "$DOTS/hosts/$HOST/setup.sh" ] && "$DOTS/hosts/$HOST/setup.sh"
+else
+    echo "    no hosts/$HOST folder — using defaults"
+    echo "monitor = , preferred, auto, 1" > "$DOTS/dotfiles/hypr/host.conf"
+fi
 
 echo "==> Dotfiles"
 mkdir -p "$HOME/.config"
