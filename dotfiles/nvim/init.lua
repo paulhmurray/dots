@@ -57,7 +57,7 @@ require("lazy").setup({
 vim.cmd.colorscheme(require("theme"))
 
 -- LSP
-vim.lsp.enable({ "gopls", "lua_ls" })
+vim.lsp.enable({ "gopls", "lua_ls", "clangd" })
 
 vim.api.nvim_create_autocmd("LspAttach", {
   callback = function(ev)
