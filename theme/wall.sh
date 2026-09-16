@@ -9,5 +9,5 @@ WALL=$(find "$DOTS/wallpapers/$THEME" -type f \( -iname '*.jpg' -o -iname '*.jpe
 if [ -n "$WALL" ]; then
     setsid swaybg -i "$WALL" -m fill >/dev/null 2>&1 &
 else
-    setsid swaybg -c "#$BG" >/dev/null 2>&1 &
+    setsid swaybg -i /usr/share/hypr/wall0.png -m fill >/dev/null 2>&1 &
 fi
