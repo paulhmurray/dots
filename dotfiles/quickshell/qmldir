@@ -7,3 +7,4 @@ Dashboard 1.0 Dashboard.qml
 singleton Weather 1.0 Weather.qml
 Osd 1.0 Osd.qml
 singleton Cava 1.0 Cava.qml
+Themes 1.0 Themes.qml

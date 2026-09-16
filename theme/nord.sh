@@ -1,0 +1,12 @@
+BG=2e3440
+BG_ALT=242933
+SURFACE=3b4252
+FG=d8dee9
+DIM=4c566a
+ACCENT=88c0d0
+RED=bf616a
+GREEN=a3be8c
+YELLOW=ebcb8b
+BLUE=81a1c1
+NVIM=nord
+ANSI=(3b4252 bf616a a3be8c ebcb8b 81a1c1 b48ead 88c0d0 e5e9f0 4c566a bf616a a3be8c ebcb8b 81a1c1 b48ead 8fbcbb eceff4)

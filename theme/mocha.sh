@@ -9,3 +9,4 @@ GREEN=a6e3a1
 YELLOW=f9e2af
 BLUE=89b4fa
 ANSI=(45475a f38ba8 a6e3a1 f9e2af 89b4fa f5c2e7 94e2d5 bac2de 585b70 f38ba8 a6e3a1 f9e2af 89b4fa f5c2e7 94e2d5 a6adc8)
+NVIM=catppuccin-mocha

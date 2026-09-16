@@ -108,3 +108,7 @@ set -g pane-active-border-style "fg=#$ACCENT"
 set -g message-style "bg=#$SURFACE,fg=#$FG"
 TMUX
 tmux source-file ~/.config/tmux/tmux.conf 2>/dev/null || true
+
+mkdir -p "$DOTS/dotfiles/nvim/lua"
+echo "return \"$NVIM\"" > "$DOTS/dotfiles/nvim/lua/theme.lua"
+echo "${1:-mocha}" > "$HOME/.config/current-theme"

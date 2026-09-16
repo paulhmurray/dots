@@ -1,0 +1,12 @@
+BG=232136
+BG_ALT=1f1d2e
+SURFACE=2a273f
+FG=e0def4
+DIM=6e6a86
+ACCENT=ea9a97
+RED=eb6f92
+GREEN=3e8fb0
+YELLOW=f6c177
+BLUE=9ccfd8
+NVIM=rose-pine-moon
+ANSI=(393552 eb6f92 3e8fb0 f6c177 9ccfd8 c4a7e7 ea9a97 e0def4 6e6a86 eb6f92 3e8fb0 f6c177 9ccfd8 c4a7e7 ea9a97 e0def4)

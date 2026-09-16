@@ -29,8 +29,11 @@ vim.opt.rtp:prepend(lazypath)
 local langs = { "lua", "go", "gomod", "bash", "dart", "markdown", "json", "yaml" }
 
 require("lazy").setup({
-  { "catppuccin/nvim", name = "catppuccin", priority = 1000,
-    config = function() vim.cmd.colorscheme("catppuccin-mocha") end },
+  { "catppuccin/nvim", name = "catppuccin", priority = 1000 },
+  { "ellisonleao/gruvbox.nvim", priority = 1000 },
+  { "shaunsingh/nord.nvim", priority = 1000 },
+  { "folke/tokyonight.nvim", priority = 1000 },
+  { "rose-pine/neovim", name = "rose-pine", priority = 1000 },
   { "nvim-telescope/telescope.nvim", dependencies = { "nvim-lua/plenary.nvim" } },
   { "nvim-treesitter/nvim-treesitter", branch = "main", lazy = false, build = ":TSUpdate",
     config = function()
@@ -50,6 +53,8 @@ require("lazy").setup({
       },
     } },
 })
+
+vim.cmd.colorscheme(require("theme"))
 
 -- LSP
 vim.lsp.enable({ "gopls", "lua_ls" })

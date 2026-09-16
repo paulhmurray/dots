@@ -1,0 +1,12 @@
+BG=1a1b26
+BG_ALT=16161e
+SURFACE=292e42
+FG=c0caf5
+DIM=565f89
+ACCENT=7aa2f7
+RED=f7768e
+GREEN=9ece6a
+YELLOW=e0af68
+BLUE=7aa2f7
+NVIM=tokyonight-night
+ANSI=(15161e f7768e 9ece6a e0af68 7aa2f7 bb9af7 7dcfff a9b1d6 414868 f7768e 9ece6a e0af68 7aa2f7 bb9af7 7dcfff c0caf5)

@@ -11,4 +11,5 @@ ShellRoot {
     Launcher {}
     Dashboard {}
     Osd {}
+    Themes {}
 }
