@@ -4,6 +4,7 @@ import Quickshell.Hyprland
 import Quickshell.Services.UPower
 import Quickshell.Services.Pipewire
 import Quickshell.Services.SystemTray
+import Quickshell.Services.Mpris
 import QtQuick
 
 PanelWindow {
@@ -134,6 +135,28 @@ PanelWindow {
         onEntered: { tip.target = clockCol; tip.text = Qt.formatDateTime(clock.date, "dddd d MMMM"); }
         onExited: if (tip.target === clockCol) tip.target = null
         onClicked: Quickshell.execDetached(["qs", "ipc", "call", "dashboard", "toggle"])
+    }
+
+    // ---- under the clock: weather, now playing ----
+    Column {
+        anchors.top: clockCol.bottom
+        anchors.topMargin: 18
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 14
+
+        Hover {
+            label: Weather.text + "  ·  " + Weather.location
+            Icon { text: Weather.icon; color: Colours.dim }
+        }
+
+        Hover {
+            id: np
+            property var player: Mpris.players.values.find(p => p.isPlaying) ?? Mpris.players.values[0] ?? null
+            visible: player !== null
+            label: player ? (player.trackTitle || "Unknown") + (player.trackArtist ? " — " + player.trackArtist : "") : ""
+            onClicked: if (player) player.togglePlaying()
+            Icon { text: np.player && np.player.isPlaying ? "󰏤" : "󰐊"; color: Colours.accent }
+        }
     }
 
     // ---- bottom: tray, wifi, volume, battery ----
