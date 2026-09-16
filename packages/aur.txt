@@ -1,2 +1,3 @@
 quickshell
-mpd-mpris
+localsend-bin
+tauon-music-box
