@@ -192,6 +192,12 @@ PanelWindow {
         spacing: 14
 
         Hover {
+            label: "Keybindings  (Super + /)"
+            onClicked: Quickshell.execDetached(["qs", "ipc", "call", "keybinds", "toggle"])
+            Icon { text: "󰌌"; color: Colours.dim }
+        }
+
+        Hover {
             id: pomo
             property bool idle: !Pomodoro.running && Pomodoro.progress === 0 && !Pomodoro.onBreak
             label: (Pomodoro.onBreak ? "Break  " : "Focus  ") + Pomodoro.label

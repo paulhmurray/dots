@@ -9,3 +9,4 @@ Osd 1.0 Osd.qml
 singleton Cava 1.0 Cava.qml
 Themes 1.0 Themes.qml
 singleton Pomodoro 1.0 Pomodoro.qml
+Keybinds 1.0 Keybinds.qml

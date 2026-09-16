@@ -13,6 +13,7 @@ ShellRoot {
     Dashboard {}
     Osd {}
     Themes {}
+    Keybinds {}
 
     IpcHandler {
         target: "pomodoro"
