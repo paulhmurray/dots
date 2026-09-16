@@ -3,3 +3,4 @@ hyprlock hypridle mako swaybg
 yazi bluez bluez-utils bluetui
 playerctl
 syncthing
+cava

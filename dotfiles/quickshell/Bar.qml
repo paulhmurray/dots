@@ -139,6 +139,7 @@ PanelWindow {
 
     // ---- under the clock: weather, now playing ----
     Column {
+        id: underClock
         anchors.top: clockCol.bottom
         anchors.topMargin: 18
         anchors.horizontalCenter: parent.horizontalCenter
@@ -159,8 +160,31 @@ PanelWindow {
         }
     }
 
+    // ---- visualiser ----
+    Column {
+        anchors.top: underClock.bottom
+        anchors.topMargin: 20
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 3
+        visible: Cava.active
+        Repeater {
+            model: Cava.values
+            Rectangle {
+                required property var modelData
+                anchors.horizontalCenter: parent.horizontalCenter
+                height: 3
+                radius: 1
+                width: 4 + modelData / 100 * 26
+                color: Colours.accent
+                opacity: 0.4 + modelData / 100 * 0.6
+                Behavior on width { NumberAnimation { duration: 60 } }
+            }
+        }
+    }
+
     // ---- bottom: tray, wifi, volume, battery ----
     Column {
+        id: bottomCol
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 12
         anchors.horizontalCenter: parent.horizontalCenter
