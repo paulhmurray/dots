@@ -112,3 +112,30 @@ tmux source-file ~/.config/tmux/tmux.conf 2>/dev/null || true
 mkdir -p "$DOTS/dotfiles/nvim/lua"
 echo "return \"$NVIM\"" > "$DOTS/dotfiles/nvim/lua/theme.lua"
 echo "${1:-mocha}" > "$HOME/.config/current-theme"
+
+cat > "$DOTS/dotfiles/zathura/zathurarc" << ZATH
+set font "JetBrainsMono Nerd Font 11"
+set default-bg "#$BG"
+set default-fg "#$FG"
+set statusbar-bg "#$BG_ALT"
+set statusbar-fg "#$FG"
+set inputbar-bg "#$BG_ALT"
+set inputbar-fg "#$FG"
+set completion-bg "#$SURFACE"
+set completion-fg "#$FG"
+set completion-highlight-bg "#$ACCENT"
+set completion-highlight-fg "#$BG"
+set index-bg "#$BG"
+set index-fg "#$FG"
+set index-active-bg "#$ACCENT"
+set index-active-fg "#$BG"
+set highlight-color "rgba($(printf '%d,%d,%d' 0x${YELLOW:0:2} 0x${YELLOW:2:2} 0x${YELLOW:4:2}),0.5)"
+set recolor true
+set recolor-lightcolor "#$BG"
+set recolor-darkcolor "#$FG"
+set recolor-keephue true
+set selection-clipboard clipboard
+set adjust-open "best-fit"
+set guioptions ""
+map r recolor
+ZATH

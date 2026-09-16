@@ -5,3 +5,5 @@ playerctl
 syncthing
 cava
 imv
+zathura zathura-pdf-mupdf
+poppler xdg-utils
