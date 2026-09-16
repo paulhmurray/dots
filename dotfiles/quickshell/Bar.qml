@@ -53,6 +53,7 @@ PanelWindow {
 
     // middle: clock
     Column {
+        id: clockCol
         anchors.centerIn: parent
         spacing: 2
         Text {
@@ -70,6 +71,11 @@ PanelWindow {
             font.family: Colours.font
             font.pixelSize: 14
         }
+    }
+
+    MouseArea {
+        anchors.fill: clockCol
+        onClicked: Quickshell.execDetached(["qs", "ipc", "call", "dashboard", "toggle"])
     }
 
     // bottom: wifi, volume, battery

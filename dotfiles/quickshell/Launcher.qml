@@ -13,7 +13,9 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+    property var hidden: ["foot client", "foot server", "avahi", "qt v4l2", "qv4l2"]
     property var apps: DesktopEntries.applications.values
+        .filter(a => !hidden.some(h => a.name.toLowerCase().includes(h)))
         .filter(a => !a.noDisplay)
         .sort((a, b) => a.name.localeCompare(b.name))
     property var filtered: apps.filter(a =>

@@ -1,1 +1,2 @@
 quickshell
+mpd-mpris

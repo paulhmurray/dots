@@ -10,8 +10,7 @@ import QtQuick.Controls
 PanelWindow {
     id: win
     visible: false
-    implicitWidth: 780
-    implicitHeight: 540
+    anchors { top: true; bottom: true; left: true; right: true }
     exclusiveZone: 0
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -84,8 +83,16 @@ PanelWindow {
         }
     }
 
-    Rectangle {
+    // click outside the panel closes it
+    MouseArea {
         anchors.fill: parent
+        onClicked: win.visible = false
+    }
+
+    Rectangle {
+        width: 780
+        height: 540
+        anchors.centerIn: parent
         color: Colours.bg
         radius: 12
         border.color: Colours.accent
@@ -93,12 +100,14 @@ PanelWindow {
         focus: true
         Keys.onEscapePressed: win.visible = false
 
+        // swallow clicks on the panel itself
+        MouseArea { anchors.fill: parent }
+
         Column {
             anchors.fill: parent
             anchors.margins: 16
             spacing: 12
 
-            // header: date + power buttons
             Item {
                 width: parent.width
                 height: 40
@@ -129,7 +138,6 @@ PanelWindow {
                 }
             }
 
-            // cards
             Row {
                 width: parent.width
                 height: parent.height - 40 - 72 - 24
@@ -211,7 +219,6 @@ PanelWindow {
                 }
             }
 
-            // media strip
             Rectangle {
                 width: parent.width
                 height: 72
