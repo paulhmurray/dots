@@ -90,8 +90,8 @@ MAKO
 hyprctl reload >/dev/null 2>&1 || true
 pkill quickshell || true
 setsid quickshell >/dev/null 2>&1 &
-pkill swaybg || true
-setsid swaybg -c "#$BG" >/dev/null 2>&1 &
+
+"$DOTS/theme/wall.sh" "${1:-mocha}"
 makoctl reload 2>/dev/null || true
 echo "theme applied: ${1:-mocha}"
 

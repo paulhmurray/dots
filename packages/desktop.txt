@@ -4,3 +4,4 @@ yazi bluez bluez-utils bluetui
 playerctl
 syncthing
 cava
+imv

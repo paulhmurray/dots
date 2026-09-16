@@ -1,1 +1,1 @@
-return "gruvbox"
+return "catppuccin-mocha"
