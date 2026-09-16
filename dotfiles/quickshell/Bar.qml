@@ -6,6 +6,7 @@ import Quickshell.Services.Pipewire
 import Quickshell.Services.SystemTray
 import Quickshell.Services.Mpris
 import QtQuick
+import QtQuick.Shapes
 
 PanelWindow {
     id: bar
@@ -189,6 +190,36 @@ PanelWindow {
         anchors.bottomMargin: 12
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: 14
+
+        Hover {
+            id: pomo
+            property bool idle: !Pomodoro.running && Pomodoro.progress === 0 && !Pomodoro.onBreak
+            label: (Pomodoro.onBreak ? "Break  " : "Focus  ") + Pomodoro.label
+                + (Pomodoro.running ? "" : "  (paused)") + "\nclick: start/pause   right-click: reset"
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onClicked: (mouse) => mouse.button === Qt.RightButton ? Pomodoro.reset() : Pomodoro.toggle()
+            Shape {
+                anchors.centerIn: parent
+                width: 22; height: 22
+                ShapePath {
+                    strokeColor: Colours.surface; strokeWidth: 3; fillColor: "transparent"
+                    PathAngleArc { centerX: 11; centerY: 11; radiusX: 9; radiusY: 9; startAngle: 0; sweepAngle: 360 }
+                }
+                ShapePath {
+                    strokeColor: Pomodoro.onBreak ? Colours.green : Colours.accent
+                    strokeWidth: 3; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+                    PathAngleArc { centerX: 11; centerY: 11; radiusX: 9; radiusY: 9; startAngle: -90; sweepAngle: 360 * Pomodoro.progress }
+                }
+            }
+            Text {
+                anchors.centerIn: parent
+                text: pomo.idle ? "󰔛" : Math.ceil(Pomodoro.remaining / 60)
+                color: pomo.idle ? Colours.dim : Colours.fg
+                font.family: Colours.font
+                font.pixelSize: pomo.idle ? 12 : 9
+                font.bold: true
+            }
+        }
 
         Repeater {
             model: SystemTray.items

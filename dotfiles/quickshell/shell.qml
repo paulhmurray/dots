@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Io
 
 ShellRoot {
     Variants {
@@ -12,4 +13,10 @@ ShellRoot {
     Dashboard {}
     Osd {}
     Themes {}
+
+    IpcHandler {
+        target: "pomodoro"
+        function toggle(): void { Pomodoro.toggle(); }
+        function reset(): void { Pomodoro.reset(); }
+    }
 }
