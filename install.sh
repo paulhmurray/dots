@@ -48,4 +48,10 @@ done
 echo "==> System scripts"
 for s in "$DOTS"/scripts/*.sh; do "$s"; done
 
+
+echo "==> Verifying"
+for bin in Hyprland foot quickshell nvim; do
+    command -v "$bin" >/dev/null || { echo "MISSING: $bin"; exit 1; }
+done
+
 echo "==> Done"

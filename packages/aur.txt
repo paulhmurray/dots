@@ -1,3 +1,2 @@
-quickshell
 localsend-bin
 tauon-music-box

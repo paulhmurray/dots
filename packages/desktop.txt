@@ -1,3 +1,4 @@
+hyprland foot xdg-desktop-portal-hyprland polkit-kde-agent qt5-wayland qt6-wayland wl-clipboard grim slurp brightnessctl pipewire-pulse wireplumber ttf-jetbrains-mono-nerd neovim quickshell
 fuzzel firefox
 hyprlock hypridle mako swaybg
 yazi bluez bluez-utils bluetui
