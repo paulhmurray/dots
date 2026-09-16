@@ -79,7 +79,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
 -- format Go on save
 vim.api.nvim_create_autocmd("BufWritePre", {
-  pattern = "*.go",
+  pattern = { "*.go", "*.c", "*.h" },
   callback = function() vim.lsp.buf.format({ async = false }) end,
 })
 
@@ -92,6 +92,7 @@ map("<leader>fg", "<cmd>Telescope live_grep<cr>", "Grep")
 map("<leader>fb", "<cmd>Telescope buffers<cr>", "Buffers")
 map("<leader>fr", "<cmd>Telescope oldfiles<cr>", "Recent files")
 map("<leader>fh", "<cmd>Telescope help_tags<cr>", "Help")
+map("<leader>fm", "<cmd>Telescope man_pages<cr>", "Man pages")
 map("<leader>w", "<cmd>w<cr>", "Save")
 map("<leader>q", "<cmd>q<cr>", "Quit")
 map("<leader>e", "<cmd>Explore<cr>", "File explorer")
