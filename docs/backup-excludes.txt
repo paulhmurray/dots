@@ -1,0 +1,44 @@
+# Caches and regenerable state
+.cache/
+.npm/
+.npm-global/
+.pub-cache/
+.dartServer/
+.gradle/
+.local/share/mise/
+.local/share/Trash/
+go/pkg/mod/
+node_modules/
+# Big app data, all confirmed disposable
+.config/.android/
+.config/splayer/
+.config/chromium/
+.config/discord/
+.config/BraveSoftware/
+.config/emacs/
+.thunderbird/
+.mail/
+.lmstudio/
+.ollama/
+Android/
+# Dropbox: client cache and tree both disposable (org committed + pushed)
+.dropbox/
+.dropbox-dist/
+Dropbox/
+# SDKs - reinstalled by hand
+flutter/
+development/flutter/
+android-sdk/
+# Projects written off this session
+Projects/penny/
+Projects/pulse/
+Projects/calendar/
+Projects/WIP/
+Projects/tmp/
+Rehearse/
+.openclaw/
+.hermes/
+# Downloads is 24G of junk; the keepers are copied separately
+Downloads/
+# Virtual machines / containers
+.local/share/libvirt/

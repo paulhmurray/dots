@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DOTS="$HOME/dots"
-HOST=$(cat /etc/hostname)
+
+# Host selection, most explicit wins:  ./install.sh <name>  >  DOTS_HOST=<name>
+# >  /etc/hostname.  A machine with no hosts/ folder is a supported case, not an
+# error: scripts/hardware.sh detects CPU and GPU so a new box needs no host layer.
+HOST="${1:-${DOTS_HOST:-$(cat /etc/hostname)}}"
 
 echo "==> Packages (pacman)"
 sudo pacman -S --needed --noconfirm $(cat "$DOTS"/packages/{desktop,system,dev}.txt)
@@ -24,8 +28,9 @@ if [ -d "$DOTS/hosts/$HOST" ]; then
         ln -sfn "$DOTS/hosts/$HOST/hyprland.conf" "$DOTS/dotfiles/hypr/host.conf"
     [ -x "$DOTS/hosts/$HOST/setup.sh" ] && "$DOTS/hosts/$HOST/setup.sh"
 else
-    echo "    no hosts/$HOST folder — using defaults"
+    echo "    no hosts/$HOST folder — using auto-detected defaults"
     echo "monitor = , preferred, auto, 1" > "$DOTS/dotfiles/hypr/host.conf"
+    NO_HOST=1
 fi
 
 echo "==> Dotfiles"
@@ -53,5 +58,23 @@ echo "==> Verifying"
 for bin in Hyprland foot quickshell nvim; do
     command -v "$bin" >/dev/null || { echo "MISSING: $bin"; exit 1; }
 done
+for f in host.conf hardware.conf; do
+    [ -f "$DOTS/dotfiles/hypr/$f" ] || { echo "MISSING: dotfiles/hypr/$f"; exit 1; }
+done
 
 echo "==> Done"
+
+# Printed last, where it is still on screen after a long install.
+if [ -n "${NO_HOST:-}" ]; then
+    cat <<EOF
+
+    NOTE: no hosts/$HOST/ folder, so displays fall back to "preferred, auto".
+    Hardware (microcode, GPU driver, Hyprland env) was detected and configured
+    regardless. To pin a monitor layout for this machine:
+
+        mkdir -p "$DOTS/hosts/$HOST"
+        hyprctl monitors -j | jq -r '.[] | "monitor = \(.name), \(.width)x\(.height)@\(.refreshRate|floor), \(.x)x\(.y), 1"' \
+            > "$DOTS/hosts/$HOST/hyprland.conf"
+        ./install.sh
+EOF
+fi
