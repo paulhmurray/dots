@@ -1,3 +1,6 @@
 snapper snap-pac
 upower
 openssh
+rsync
+gptfdisk
+parted

@@ -20,3 +20,22 @@ PS1='\[\e[35m\]\w\[\e[0m\] \[\e[2m\]$(git branch --show-current 2>/dev/null)\[\e
 
 eval "$(fzf --bash)"
 alias wall='~/dots/theme/wall.sh'
+
+# --- dev environment ---
+export GOPATH="$HOME/go"
+export ANDROID_HOME="$HOME/Android/Sdk"
+export CHROME_EXECUTABLE=/usr/bin/chromium
+[ -d /usr/lib/jvm/java-17-openjdk ] && export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+
+for p in "$GOPATH/bin" "$HOME/.local/bin" "$HOME/development/flutter/bin" \
+         "$ANDROID_HOME/emulator" "$ANDROID_HOME/platform-tools" \
+         "$ANDROID_HOME/cmdline-tools/latest/bin" "$HOME/.npm-global/bin" "$HOME/.opencode/bin"; do
+    case ":$PATH:" in *":$p:"*) ;; *) [ -d "$p" ] && PATH="$PATH:$p" ;; esac
+done
+export PATH
+
+command -v starship >/dev/null && eval "$(starship init bash)"
+command -v zoxide   >/dev/null && eval "$(zoxide init bash)"
+
+# machine-local and untracked: anything naming hosts, IPs or secrets
+[ -f "$HOME/.bashrc.local" ] && . "$HOME/.bashrc.local"
