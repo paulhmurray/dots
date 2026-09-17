@@ -3,3 +3,5 @@ gopls lua-language-server
 tree-sitter-cli
 tmux
 clang gdb valgrind make man-db man-pages
+github-cli
+lazygit

@@ -4,3 +4,14 @@ openssh
 rsync
 gptfdisk
 parted
+bat
+eza
+zoxide
+starship
+btop
+jq
+unzip
+wget
+tree
+plocate
+pacman-contrib

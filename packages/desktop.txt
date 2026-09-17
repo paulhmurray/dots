@@ -8,3 +8,8 @@ cava
 imv
 zathura zathura-pdf-mupdf
 poppler xdg-utils
+imagemagick
+mpv
+noto-fonts
+noto-fonts-cjk
+noto-fonts-emoji
