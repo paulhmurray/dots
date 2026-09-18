@@ -1,7 +1,27 @@
 #!/usr/bin/env bash
+# Regenerates every colour file from one palette.
+#
+# Order matters: all files are written first, then things that can fail are
+# done. The generated files are not tracked, so a run that dies half way leaves
+# the machine with no colours at all — nvim's init.lua does require("theme"),
+# and Hyprland and quickshell both error on a missing file.
 set -euo pipefail
 DOTS="$HOME/dots"
-source "$DOTS/theme/${1:-mocha}.sh"
+
+# With no argument, keep the theme this machine already chose. The theme is a
+# per-machine choice and is not repo state, so defaulting to a fixed name would
+# let any automated caller — install.sh, dots sync — silently switch it.
+THEME="${1:-}"
+[ -n "$THEME" ] || THEME=$(cat "$HOME/.config/current-theme" 2>/dev/null || true)
+if [ -z "$THEME" ]; then
+    THEME=mocha                          # fresh machine, nothing chosen yet
+elif [ ! -f "$DOTS/theme/$THEME.sh" ]; then
+    echo "theme '$THEME' has no palette; falling back to mocha" >&2
+    THEME=mocha
+fi
+source "$DOTS/theme/$THEME.sh"
+
+# ---- write everything ----------------------------------------------------
 
 cat > "$DOTS/dotfiles/hypr/colours.conf" << CONF
 \$bg = rgb($BG)
@@ -87,14 +107,6 @@ anchor=top-right
 margin=10
 MAKO
 
-hyprctl reload >/dev/null 2>&1 || true
-pkill quickshell || true
-setsid quickshell >/dev/null 2>&1 &
-
-"$DOTS/theme/wall.sh" "${1:-mocha}"
-makoctl reload 2>/dev/null || true
-echo "theme applied: ${1:-mocha}"
-
 cat > "$DOTS/dotfiles/tmux/colours.conf" << TMUX
 set -g status-style "bg=#$BG_ALT,fg=#$FG"
 set -g status-left-length 30
@@ -107,11 +119,9 @@ set -g pane-border-style "fg=#$SURFACE"
 set -g pane-active-border-style "fg=#$ACCENT"
 set -g message-style "bg=#$SURFACE,fg=#$FG"
 TMUX
-tmux source-file ~/.config/tmux/tmux.conf 2>/dev/null || true
 
 mkdir -p "$DOTS/dotfiles/nvim/lua"
 echo "return \"$NVIM\"" > "$DOTS/dotfiles/nvim/lua/theme.lua"
-echo "${1:-mocha}" > "$HOME/.config/current-theme"
 
 cat > "$DOTS/dotfiles/zathura/zathurarc" << ZATH
 set font "JetBrainsMono Nerd Font 11"
@@ -139,3 +149,20 @@ set adjust-open "best-fit"
 set guioptions ""
 map r recolor
 ZATH
+
+# Recorded only once every file above exists, so a failed run does not leave
+# this machine claiming a theme it has not actually got.
+echo "$THEME" > "$HOME/.config/current-theme"
+
+# ---- then tell everything to pick it up ----------------------------------
+# Past this point nothing writes a colour file, so a failure here costs a
+# reload, not a machine with half a theme.
+
+hyprctl reload >/dev/null 2>&1 || true
+pkill quickshell || true
+setsid quickshell >/dev/null 2>&1 &
+makoctl reload 2>/dev/null || true
+tmux source-file ~/.config/tmux/tmux.conf 2>/dev/null || true
+"$DOTS/theme/wall.sh" "$THEME" || true
+
+echo "theme applied: $THEME"
