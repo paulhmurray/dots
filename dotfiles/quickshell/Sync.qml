@@ -24,6 +24,55 @@ Singleton {
     readonly property int count:
         behind + ahead + dirty + drift.length + aurDrift.length
 
+    // Available updates, deliberately NOT part of status.json and never shown
+    // on the bar: Arch always has updates, so an indicator driven by them is
+    // permanently lit and therefore means nothing. Fetched when the Dashboard
+    // opens — a deliberate "tell me where things stand" — rather than on a
+    // timer or on hover, either of which would hit a mirror constantly.
+    property int  updates: -1        // -1 = not checked yet this session
+    property int  aurUpdates: -1
+    property string lastUpgrade: ""
+    property bool checking: false
+
+    function refreshUpdates() {
+        if (updateProc.running) return;
+        root.checking = true;
+        updateProc.running = true;
+    }
+
+    Process {
+        id: updateProc
+        // checkupdates syncs into its own temp database, so this needs no sudo
+        // and cannot cause a partial upgrade. It exits 2 when there is nothing
+        // to report, which is why the count comes from wc rather than $?.
+        command: ["sh", "-c",
+            "checkupdates 2>/dev/null | wc -l; " +
+            "yay -Qua 2>/dev/null | wc -l; " +
+            "grep 'starting full system upgrade' /var/log/pacman.log 2>/dev/null " +
+            "| tail -1 | sed 's/^\\[//; s/T.*//'"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const l = text.trim().split("\n");
+                root.updates    = Number(l[0] ?? 0);
+                root.aurUpdates = Number(l[1] ?? 0);
+                root.lastUpgrade = (l[2] ?? "").trim();
+                root.checking = false;
+            }
+        }
+    }
+
+    // The git side, one entry per thing that is true. A single line would have
+    // to pick a winner, and "3 commits to pull" while quietly sitting on 2
+    // uncommitted files is exactly the half-truth the Dashboard exists to
+    // avoid. Empty when there is nothing to say.
+    readonly property var gitLines: {
+        const out = [];
+        if (behind > 0) out.push(behind + " commit(s) to pull");
+        if (ahead > 0)  out.push(ahead + " commit(s) to push");
+        if (dirty > 0)  out.push(dirty + " uncommitted file(s)");
+        return out;
+    }
+
     readonly property string summary: {
         const bits = [];
         if (behind > 0)         bits.push(behind + " commit(s) to pull");

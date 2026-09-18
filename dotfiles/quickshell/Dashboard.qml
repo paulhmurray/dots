@@ -21,6 +21,11 @@ PanelWindow {
         function toggle(): void { win.visible = !win.visible; }
     }
 
+    // Opening the dashboard is the deliberate "where do things stand" moment,
+    // so it is where the update check belongs — once per open, never on a
+    // timer and never on hover.
+    onVisibleChanged: if (visible) Sync.refreshUpdates()
+
     SystemClock { id: clock; precision: SystemClock.Minutes }
 
     property var player: Mpris.players.values.find(p => p.isPlaying)
@@ -90,7 +95,7 @@ PanelWindow {
     }
 
     Rectangle {
-        width: 780
+        width: 980
         height: 540
         anchors.centerIn: parent
         color: Colours.bg
@@ -145,7 +150,7 @@ PanelWindow {
 
                 Card {
                     title: "CALENDAR"
-                    width: (parent.width - 24) / 3
+                    width: (parent.width - 36) / 4
                     height: parent.height
                     MonthGrid {
                         id: grid
@@ -166,7 +171,7 @@ PanelWindow {
 
                 Card {
                     title: "SYSTEM"
-                    width: (parent.width - 24) / 3
+                    width: (parent.width - 36) / 4
                     height: parent.height
                     Column {
                         anchors.fill: parent
@@ -187,7 +192,7 @@ PanelWindow {
 
                 Card {
                     title: "STATUS"
-                    width: (parent.width - 24) / 3
+                    width: (parent.width - 36) / 4
                     height: parent.height
                     Column {
                         anchors.fill: parent
@@ -215,6 +220,97 @@ PanelWindow {
 
                         Txt { text: "󰖙  " + Weather.text }
                         Txt { text: Weather.location; color: Colours.dim; font.pixelSize: 11 }
+                    }
+                }
+
+                Card {
+                    title: "DOTS"
+                    width: (parent.width - 36) / 4
+                    height: parent.height
+                    Column {
+                        anchors.fill: parent
+                        spacing: 10
+
+                        Txt {
+                            width: parent.width
+                            visible: Sync.gitLines.length === 0
+                            text: "󰄬  " + (Sync.stale ? "up to date (check failed)" : "up to date")
+                            color: Sync.stale ? Colours.dim : Colours.green
+                        }
+                        Column {
+                            width: parent.width
+                            spacing: 2
+                            Repeater {
+                                model: Sync.gitLines
+                                Txt {
+                                    required property var modelData
+                                    width: parent.width
+                                    wrapMode: Text.WordWrap
+                                    text: "󰅢  " + modelData
+                                    color: Colours.accent
+                                }
+                            }
+                        }
+
+                        // The reason this card is worth opening: the bar can
+                        // only say four packages drifted, this says which.
+                        Column {
+                            width: parent.width
+                            spacing: 2
+                            visible: Sync.drift.length > 0 || Sync.aurDrift.length > 0
+                            Txt {
+                                text: "󰏗  " + (Sync.drift.length + Sync.aurDrift.length)
+                                      + " not in any list"
+                                color: Colours.yellow
+                            }
+                            Txt {
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                text: Sync.drift.concat(Sync.aurDrift).join("  ")
+                                color: Colours.dim
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Txt {
+                            text: "󰚰  " + (Sync.checking || Sync.updates < 0
+                                  ? "checking…"
+                                  : Sync.updates + " repo · " + Sync.aurUpdates + " AUR")
+                        }
+
+                        Txt {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: "󰃭  upgraded " + (Sync.lastUpgrade !== "" ? Sync.lastUpgrade : "never")
+                            color: Colours.dim
+                            font.pixelSize: 11
+                        }
+
+                        Txt {
+                            text: "󰏘  " + (Sync.theme !== "" ? Sync.theme : "—")
+                            color: Colours.dim
+                            font.pixelSize: 11
+                        }
+
+                        Item { width: 1; height: 4 }
+
+                        Row {
+                            spacing: 8
+                            IconButton {
+                                icon: "󰓦"
+                                action: () => {
+                                    win.visible = false;
+                                    Quickshell.execDetached(["foot", "-e", "dots", "sync"]);
+                                }
+                            }
+                            IconButton {
+                                icon: "󰚰"
+                                action: () => {
+                                    win.visible = false;
+                                    Quickshell.execDetached(["foot", "-e", "dots", "upgrade"]);
+                                }
+                            }
+                        }
                     }
                 }
             }
