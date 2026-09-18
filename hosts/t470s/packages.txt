@@ -1,1 +1,7 @@
 intel-media-driver tlp
+dnsmasq
+libvirt
+linux-lts
+qemu-desktop
+spice-vdagent
+virt-manager
