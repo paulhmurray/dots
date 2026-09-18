@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Refuses commits that would publish a secret. This repo is public, and the
+# machines it configures hold live production ssh keys and a GitHub token.
+#
+# Enabled per clone by install.sh:  git config core.hooksPath hooks
+# Scans only what is staged, so it stays fast and never complains about files
+# you have not touched.
+set -euo pipefail
+
+# desktop-prep holds machine details on purpose. Without this exemption every
+# commit on it would be refused, and the habit of reaching for --no-verify is
+# the thing this hook exists to prevent.
+branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+if [ "$branch" = desktop-prep ]; then
+    echo "pre-commit: skipped on desktop-prep (it holds machine details by design)"
+    exit 0
+fi
+
+fail=0
+refuse() { printf 'pre-commit: %s\n' "$*" >&2; fail=1; }
+
+# ---- paths that are never safe to commit ---------------------------------
+while IFS= read -r p; do
+    [ -n "$p" ] && refuse "refusing $p — that path looks like a credential"
+done < <(git diff --cached --name-only --diff-filter=ACMR \
+         | grep -E '(^|/)\.ssh/|(^|/)id_[a-z0-9]+$|\.pem$|\.key$|(^|/)\.git-credentials$' \
+         || true)
+
+# ---- secret shapes in added lines ----------------------------------------
+# Only added lines, and only shapes: matching the word "password" would flag
+# the README's own `nmcli ... password "..."` example, which teaches nothing
+# and trains you to ignore the hook.
+added=$(git diff --cached --diff-filter=ACMR -U0 | grep '^+' | grep -v '^+++' || true)
+
+check() {
+    local pattern="$1" what="$2" hit
+    hit=$(grep -nEi -- "$pattern" <<<"$added" | head -3 || true)
+    if [ -n "$hit" ]; then
+        refuse "$what:"
+        sed 's/^/    /' <<<"$hit" >&2
+    fi
+}
+
+check 'BEGIN [A-Z ]*PRIVATE KEY'              "a private key"
+check 'ssh-(rsa|ed25519|dss) AAAA'            "an ssh public key"
+check 'gh[pousr]_[A-Za-z0-9]{16,}'            "a GitHub token"
+check 'github_pat_[A-Za-z0-9_]{20,}'          "a GitHub fine-grained token"
+check 'AKIA[0-9A-Z]{16}'                      "an AWS access key"
+check 'xox[baprs]-[A-Za-z0-9-]{10,}'          "a Slack token"
+
+# IPv4, minus the ones that identify nothing. A dotted quad in this repo is
+# almost always a real host, which the constraints say must never be tracked.
+ips=$(grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' <<<"$added" \
+      | grep -vE '^(127\.0\.0\.1|0\.0\.0\.0|255\.255\.255\.255|8\.8\.8\.8)$' \
+      | sort -u || true)
+if [ -n "$ips" ]; then
+    refuse "an IP address:"
+    sed 's/^/    /' <<<"$ips" >&2
+fi
+
+if [ "$fail" = 1 ]; then
+    cat >&2 <<'EOF'
+
+Nothing was committed. This repo is public — move the value into
+~/.bashrc.local (untracked, sourced by home/.bashrc) or another local file.
+
+If this is a false positive, commit with --no-verify, then tell the hook about
+it so the next person does not have to think about it.
+EOF
+    exit 1
+fi

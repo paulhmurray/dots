@@ -55,6 +55,12 @@ mkdir -p "$HOME/.local/bin"
 ln -sfn "$DOTS/bin/dots" "$HOME/.local/bin/dots"
 echo "    linked dots"
 
+echo "==> Hooks"
+# Per clone, so a fork or a fresh machine gets the secret scan without anyone
+# remembering to turn it on.
+git -C "$DOTS" config core.hooksPath hooks
+echo "    pre-commit secret scan enabled"
+
 echo "==> Remote"
 # HTTPS, not SSH: reading a public repo needs no credentials, so the status
 # timer can fetch with nobody present. An SSH remote would need a passphrase
