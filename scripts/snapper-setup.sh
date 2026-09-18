@@ -1,8 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ -f /etc/snapper/configs/root ]; then
+# A config file proves a config was created, not that this machine is actually
+# rollback-safe. The point of the setup below is that /.snapshots is the
+# TOP-LEVEL @snapshots subvolume, so swapping the root subvolume leaves the
+# snapshots alone. Check for that, not just for the file — otherwise a first
+# run that died between create-config and the subvolume swap reports "already
+# configured" forever, and the README's recovery procedure quietly does not
+# work on this machine.
+if [ -f /etc/snapper/configs/root ] \
+   && findmnt -n -o SOURCE /.snapshots 2>/dev/null | grep -q '\[/@snapshots\]'; then
     echo "snapper already configured, skipping"
+    exit 0
+fi
+
+if [ -f /etc/snapper/configs/root ]; then
+    cat >&2 <<'WARN'
+
+    WARNING: snapper has a config, but /.snapshots is not the top-level
+    @snapshots subvolume. A previous run did not finish.
+
+    Snapshots taken now live inside the root subvolume, so rolling root back
+    would take them with it and the recovery procedure in the README will not
+    work on this machine. To repair, remove the config and re-run:
+
+        sudo snapper -c root delete-config
+        ~/dots/scripts/snapper-setup.sh
+
+WARN
     exit 0
 fi
 

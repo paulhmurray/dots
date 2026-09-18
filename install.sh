@@ -12,7 +12,27 @@ DOTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOST="${1:-${DOTS_HOST:-$(cat /etc/hostname)}}"
 
 echo "==> Packages (pacman)"
-sudo pacman -S --needed --noconfirm $(cat "$DOTS"/packages/{desktop,system,dev}.txt)
+# One list at a time, and on failure one package at a time. A single renamed or
+# mistyped name used to abort the whole run under set -e, before any symlink was
+# made — so a machine could end up with packages and no configuration at all.
+# Now the good ones land, the bad ones are named, and the run continues.
+PKG_FAILED=()
+install_list() {
+    local file="$1" name pkg
+    name=$(basename "$file" .txt)
+    # shellcheck disable=SC2046  # word splitting is the point: see the list format
+    if sudo pacman -S --needed --noconfirm $(cat "$file"); then
+        return 0
+    fi
+    echo "    '$name' failed as a batch — retrying one at a time to find the culprit"
+    for pkg in $(cat "$file"); do
+        sudo pacman -S --needed --noconfirm "$pkg" >/dev/null 2>&1 \
+            || { echo "      could not install: $pkg"; PKG_FAILED+=("$pkg"); }
+    done
+}
+for list in desktop system dev; do
+    install_list "$DOTS/packages/$list.txt"
+done
 
 echo "==> AUR helper"
 if ! command -v yay >/dev/null; then
@@ -47,19 +67,32 @@ echo "==> Theme"
 
 echo "==> Dotfiles"
 mkdir -p "$HOME/.config"
+# rm -rf on a symlink removes the link, which is what we want on a re-run. On a
+# real directory it would remove someone's actual config, so that gets moved
+# aside instead. A fresh archinstall has a real ~/.bashrc from /etc/skel, so
+# this is the normal first-run path, not an edge case.
+link_over() {
+    local src="$1" dest="$2" name="$3"
+    if [ -e "$dest" ] && [ ! -L "$dest" ]; then
+        local keep="$dest.pre-dots.$(date +%Y%m%d-%H%M%S)"
+        mv "$dest" "$keep"
+        echo "    kept your existing $name as $(basename "$keep")"
+    else
+        rm -rf "$dest"
+    fi
+    ln -sfn "$src" "$dest"
+    echo "    linked $name"
+}
+
 for dir in "$DOTS"/dotfiles/*/; do
     name=$(basename "$dir")
-    rm -rf "$HOME/.config/$name"
-    ln -sfn "$dir" "$HOME/.config/$name"
-    echo "    linked $name"
+    link_over "$dir" "$HOME/.config/$name" "$name"
 done
 
 echo "==> Home files"
 for f in "$DOTS"/home/.[!.]*; do
     name=$(basename "$f")
-    rm -f "$HOME/$name"
-    ln -sfn "$f" "$HOME/$name"
-    echo "    linked $name"
+    link_over "$f" "$HOME/$name" "$name"
 done
 
 echo "==> Command"
@@ -121,6 +154,20 @@ for d in "$HOME"/.config/{foot,mako,zathura}; do
 done
 
 echo "==> Done"
+
+# Printed after "Done", where it is still on screen. A package that failed to
+# install is the one thing here you have to act on.
+if [ ${#PKG_FAILED[@]} -gt 0 ]; then
+    cat <<EOF
+
+    NOTE: these packages could not be installed:
+        ${PKG_FAILED[*]}
+
+    Everything else was installed and all configuration was linked. Usually a
+    package has been renamed or dropped from the repos: check with
+    'pacman -Ss <name>', then fix the list and 'dots add' the new name.
+EOF
+fi
 
 # Printed last, where it is still on screen after a long install.
 if [ -n "${NO_HOST:-}" ]; then
