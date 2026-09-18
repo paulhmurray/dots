@@ -38,6 +38,13 @@ Scoped deliberately: a token limited to this repo can only ever touch this repo.
 use an account-wide token or an SSH key here — this repo is public and nothing in it
 should hold credentials that reach anything else.
 
+## Machine-local, never committed
+
+- `~/.bashrc.local` — anything naming hosts, IPs or secrets; sourced by `home/.bashrc`
+- `~/.config/current-theme` — which theme this machine chose
+- `~/.config/dots/location` — one line, the city for the weather widget. Without it
+  wttr.in geolocates by IP, which follows a laptop but resolves to the ISP's city.
+
 ## Layout
 
 - `packages/`  pacman lists (desktop, system, dev) and `aur.txt`
