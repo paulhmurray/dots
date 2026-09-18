@@ -188,66 +188,103 @@ append_pkg() {
 }
 
 cmd_add() {
-    local pkg="" list=""
+    local list="" pkgs=()
     while [ $# -gt 0 ]; do
         case "$1" in
             --desktop|--system|--dev|--aur) list="${1#--}" ;;
             --host) list=host ;;
             -*) echo "dots add: unknown option $1" >&2; return 2 ;;
-            *)  pkg="$1" ;;
+            *)  pkgs+=("$1") ;;
         esac
         shift
     done
-    [ -n "$pkg" ] || { echo "usage: dots add <package> [--dev|--system|--desktop|--aur|--host]" >&2; return 2; }
+    [ ${#pkgs[@]} -gt 0 ] || {
+        echo "usage: dots add <package>... [--dev|--system|--desktop|--aur|--host]" >&2
+        return 2
+    }
 
     cd "$DOTS"
 
-    if grep -qxF "$pkg" <(dots_declared); then
-        echo "$pkg is already declared — nothing to do."
+    # Sort into: already written down, from a repo, from the AUR. Resolve every
+    # name before installing anything, so one typo cannot leave half the list
+    # recorded and the other half not.
+    local declared native=() aur=() skipped=()
+    declared=$(dots_declared)
+    local p
+    for p in "${pkgs[@]}"; do
+        if grep -qxF "$p" <<<"$declared"; then
+            skipped+=("$p")
+        elif pacman -Si "$p" >/dev/null 2>&1; then
+            native+=("$p")
+        elif yay -Si "$p" >/dev/null 2>&1; then
+            aur+=("$p")
+        else
+            echo "dots add: no package called '$p' in the repos or the AUR" >&2
+            return 1
+        fi
+    done
+
+    [ ${#skipped[@]} -gt 0 ] && echo "==> Already declared, skipping: ${skipped[*]}"
+    if [ ${#native[@]} -eq 0 ] && [ ${#aur[@]} -eq 0 ]; then
+        echo "Nothing to do."
         return 0
     fi
+    [ ${#aur[@]} -gt 0 ] && echo "==> From the AUR: ${aur[*]}"
 
-    # Where it comes from decides which list it may go in.
-    local from_aur=0
-    if pacman -Si "$pkg" >/dev/null 2>&1; then
-        from_aur=0
-    elif yay -Si "$pkg" >/dev/null 2>&1; then
-        from_aur=1
-        echo "==> $pkg is an AUR package"
-        list=aur
-    else
-        echo "dots add: no package called '$pkg' in the repos or the AUR" >&2
-        return 1
-    fi
-
-    if [ -z "$list" ]; then
-        echo "Which list should $pkg go in?"
-        local opts=(desktop system dev host)
+    if [ ${#native[@]} -gt 0 ] && [ -z "$list" ]; then
+        echo "Which list should ${native[*]} go in?"
+        local opts=(desktop system dev host) choice
         select choice in "${opts[@]}"; do
             [ -n "${choice:-}" ] && { list="$choice"; break; }
         done
     fi
 
-    local file
-    case "$list" in
-        host) file="$DOTS/hosts/$(dots_host)/packages.txt" ;;
-        *)    file="$DOTS/packages/$list.txt" ;;
-    esac
-    [ -f "$file" ] || { echo "dots add: no such list: $file" >&2; return 1; }
-
-    cmd_upgrade
-    echo "==> Installing $pkg"
-    if [ "$from_aur" = 1 ]; then
-        yay -S --needed "$pkg"
-    else
-        sudo pacman -S --needed "$pkg"
+    local file=""
+    if [ ${#native[@]} -gt 0 ]; then
+        case "$list" in
+            host) file="$DOTS/hosts/$(dots_host)/packages.txt" ;;
+            aur)  echo "dots add: --aur is for AUR packages; ${native[*]} are in a repo" >&2
+                  return 2 ;;
+            *)    file="$DOTS/packages/$list.txt" ;;
+        esac
+        [ -f "$file" ] || { echo "dots add: no such list: $file" >&2; return 1; }
     fi
 
-    append_pkg "$file" "$pkg"
-    echo "==> Recorded in ${file#"$DOTS"/}"
+    # Anything already on the machine needs no install, and therefore no
+    # upgrade: the stale-database problem only bites when pacman has to fetch
+    # something. Recording drift you already have is free.
+    local to_install=()
+    for p in "${native[@]}" "${aur[@]}"; do
+        pacman -Qq "$p" >/dev/null 2>&1 || to_install+=("$p")
+    done
 
-    git add "$file"
-    git commit -q -m "packages: add $pkg"
+    if [ ${#to_install[@]} -gt 0 ]; then
+        cmd_upgrade
+        local want_native=() want_aur=()
+        for p in "${native[@]}"; do
+            printf '%s\n' "${to_install[@]}" | grep -qxF "$p" && want_native+=("$p")
+        done
+        for p in "${aur[@]}"; do
+            printf '%s\n' "${to_install[@]}" | grep -qxF "$p" && want_aur+=("$p")
+        done
+        echo "==> Installing: ${to_install[*]}"
+        [ ${#want_native[@]} -gt 0 ] && sudo pacman -S --needed "${want_native[@]}"
+        [ ${#want_aur[@]} -gt 0 ] && yay -S --needed "${want_aur[@]}"
+    else
+        echo "==> All already installed; recording them only"
+    fi
+
+    local changed=()
+    for p in "${native[@]}"; do append_pkg "$file" "$p"; done
+    [ ${#native[@]} -gt 0 ] && { git add "$file"; changed+=("${file#"$DOTS"/}"); }
+    if [ ${#aur[@]} -gt 0 ]; then
+        for p in "${aur[@]}"; do append_pkg "$DOTS/packages/aur.txt" "$p"; done
+        git add "$DOTS/packages/aur.txt"
+        changed+=(packages/aur.txt)
+    fi
+    echo "==> Recorded in ${changed[*]}"
+
+    git commit -q -m "packages: add ${native[*]} ${aur[*]}"
     if git push -q 2>/dev/null; then
         echo "==> Pushed"
     else
