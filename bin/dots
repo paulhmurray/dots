@@ -27,6 +27,13 @@ its [Y/n] so you can see a kernel bump coming.
 EOF
 }
 
+# Anything that changes the answer refreshes the cached answer. Without this
+# the bar goes on showing what was true before you acted — and the moment just
+# after you have acted is exactly when you look at it. The pacman path unit
+# hides this when a package was really installed, but not when sync pulls
+# nothing or add records something already present.
+refresh_status() { cmd_status --write >/dev/null 2>&1 || true; }
+
 # --- upgrade ---------------------------------------------------------------
 # yay rather than pacman: pacman -Syu never touches AUR packages, so the AUR
 # half of the machine would silently rot. Interactive on purpose — no
@@ -43,6 +50,7 @@ cmd_upgrade() {
         diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") \
             | grep '^>' | sed 's/^> /      /'
     fi
+    refresh_status
 }
 
 # --- auth ------------------------------------------------------------------
@@ -133,6 +141,7 @@ cmd_sync() {
         echo "==> Already up to date"
         # The theme files were just discarded; put them back before leaving.
         "$DOTS/theme/apply.sh" >/dev/null 2>&1 || true
+        refresh_status
         return 0
     fi
 
@@ -172,6 +181,7 @@ cmd_sync() {
         "$DOTS/theme/apply.sh" >/dev/null 2>&1 || true
     fi
 
+    refresh_status
     echo "==> Done"
 }
 
@@ -295,6 +305,7 @@ cmd_add() {
             auth_help >&2
         fi
     fi
+    refresh_status
 }
 
 cmd_status() {
