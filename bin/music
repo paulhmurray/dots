@@ -56,7 +56,23 @@ case "${1:-}" in
     shuffle-on)  ensure; timeout 6 busctl --user set-property "$DEST" "$OBJ" "$IFACE" Shuffle b true ;;
     shuffle-off) ensure; timeout 6 busctl --user set-property "$DEST" "$OBJ" "$IFACE" Shuffle b false ;;
 
-    raise) ensure; timeout 6 busctl --user call "$DEST" "$OBJ" org.mpris.MediaPlayer2 Raise >/dev/null ;;
+    # Raise, then tame the window. Tauon opens FULLSCREEN, which is why raising
+    # it appears to swallow the whole workspace; clearing that has to come
+    # first, because resize and float are both refused on a fullscreen window
+    # ("Window is fullscreen"). A windowrule would be the natural home for this
+    # but no syntax this Hyprland build accepts actually took effect.
+    raise)
+        ensure
+        timeout 6 busctl --user call "$DEST" "$OBJ" org.mpris.MediaPlayer2 Raise >/dev/null || true
+        if command -v hyprctl >/dev/null; then
+            sleep 0.3
+            hyprctl dispatch focuswindow 'class:^(tauonmb)$' >/dev/null 2>&1 || true
+            hyprctl dispatch fullscreenstate 0 0 >/dev/null 2>&1 || true
+            hyprctl dispatch setfloating >/dev/null 2>&1 || true
+            hyprctl dispatch resizeactive exact 1200 760 >/dev/null 2>&1 || true
+            hyprctl dispatch centerwindow >/dev/null 2>&1 || true
+        fi
+        ;;
 
     *)
         cat <<'EOF'
