@@ -1,0 +1,271 @@
+#!/usr/bin/env python3
+"""Fetch missing album art into ~/Music as folder.jpg.
+
+Tauon looks for embedded art first, then an image beside the tracks. This
+library already uses folder.jpg everywhere it has art, so that is what we
+write.
+
+Only ever adds: it skips any folder that already has an image, and never
+touches an audio file. Safe to re-run — results are cached, so a second run
+only retries what has not been tried.
+
+  music-art            report what is missing, change nothing
+  music-art --fetch    fetch and write folder.jpg
+  music-art --fetch -n 20   stop after 20 successful downloads
+  music-art --retry    also retry folders that previously found nothing
+"""
+import argparse
+import collections
+import json
+import os
+import re
+import sys
+import time
+import difflib
+import urllib.parse
+import urllib.request
+
+MUSIC = os.path.expanduser(os.environ.get("MUSIC_DIR", "~/Music"))
+CACHE_DIR = os.path.join(
+    os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "dots"
+)
+CACHE = os.path.join(CACHE_DIR, "music-art.json")
+AUDIO = {".mp3", ".flac", ".m4a", ".ogg", ".opus", ".wav", ".wma", ".aac"}
+IMAGE = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
+UA = "dots-music-art/1 (personal use)"
+
+try:
+    from mutagen import File as MutagenFile
+except ImportError:
+    sys.exit("music-art: python-mutagen is not installed")
+
+
+def has_embedded(path):
+    try:
+        a = MutagenFile(path)
+        if a is None:
+            return False
+        if getattr(a, "pictures", None):
+            return True
+        tags = a.tags
+        if not tags:
+            return False
+        return any(
+            str(k).startswith("APIC") or str(k) == "covr" or "METADATA_BLOCK_PICTURE" in str(k).upper()
+            for k in tags.keys()
+        )
+    except Exception:
+        return False
+
+
+def album_folders():
+    """Folders holding audio, with whether they already have art."""
+    found = collections.defaultdict(list)
+    for root, _dirs, files in os.walk(MUSIC):
+        for f in files:
+            if os.path.splitext(f)[1].lower() in AUDIO:
+                found[root].append(f)
+    out = []
+    for folder, files in sorted(found.items()):
+        imgs = [f for f in os.listdir(folder) if os.path.splitext(f)[1].lower() in IMAGE]
+        if imgs:
+            continue
+        if has_embedded(os.path.join(folder, sorted(files)[0])):
+            continue
+        out.append((folder, len(files)))
+    return out
+
+
+def tags_of(folder):
+    artists, albums = collections.Counter(), collections.Counter()
+    for f in sorted(os.listdir(folder))[:6]:
+        if os.path.splitext(f)[1].lower() not in AUDIO:
+            continue
+        try:
+            a = MutagenFile(os.path.join(folder, f), easy=True)
+            if not a or not a.tags:
+                continue
+            t = a.tags
+            if t.get("albumartist"):
+                artists[t["albumartist"][0]] += 1
+            elif t.get("artist"):
+                artists[t["artist"][0]] += 1
+            if t.get("album"):
+                albums[t["album"][0]] += 1
+        except Exception:
+            pass
+    return (
+        artists.most_common(1)[0][0] if artists else "",
+        albums.most_common(1)[0][0] if albums else "",
+    )
+
+
+def from_folder_name(folder):
+    base = os.path.basename(folder)
+    if " - " in base:
+        a, b = base.split(" - ", 1)
+        return a.strip(), b.strip()
+    return "", base.strip()
+
+
+def simplify(name):
+    """Drop the decorations that stop an album title matching a catalogue."""
+    name = re.sub(r"\s*[\(\[](disc|cd|volume|vol|bonus)[^\)\]]*[\)\]]", "", name, flags=re.I)
+    name = re.sub(r"\s*:\s*(collector'?s|deluxe|special|expanded|remaster).*$", "", name, flags=re.I)
+    return name.strip(" -–:")
+
+
+def get_json(url):
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.load(r)
+
+
+def close_enough(want, got):
+    """Is the catalogue's album title actually the one we asked for?
+
+    Without this, Deezer confidently returns its best guess: "Limewire" comes
+    back as an AC/DC bootleg called "Live Wire", which is a worse outcome than
+    no art at all. Punctuation and a trailing "(Deluxe)" are fine; a different
+    album is not.
+    """
+    a = re.sub(r"[^a-z0-9 ]", "", want.lower()).strip()
+    b = re.sub(r"[^a-z0-9 ]", "", got.lower()).strip()
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    # A prefix match is usually a qualifier the catalogue adds — "About A Boy"
+    # vs "About A Boy Soundtrack". But it also lets "AC/DC Live" match "AC/DC
+    # Live American Broadcast", which is a different record, so only a short
+    # tail is allowed.
+    if (b.startswith(a) or a.startswith(b)) and abs(len(a) - len(b)) <= 14:
+        return True
+    return difflib.SequenceMatcher(None, a, b).ratio() >= 0.82
+
+
+def deezer(artist, album):
+    """(cover URL, what it matched) for artist+album, or (None, None)."""
+    if not artist or not album or album.lower().startswith("unknown"):
+        return None, None
+    strict = "https://api.deezer.com/search/album?q=" + urllib.parse.quote(
+        f'artist:"{artist}" album:"{album}"'
+    )
+    loose = "https://api.deezer.com/search/album?q=" + urllib.parse.quote(f"{artist} {album}")
+    for url in (strict, loose):
+        try:
+            data = get_json(url)
+        except Exception:
+            continue
+        for a in (data.get("data") or [])[:5]:
+            if a["artist"]["name"].lower()[:6] != artist.lower()[:6]:
+                continue
+            if not close_enough(album, a["title"]):
+                continue
+            return (a.get("cover_xl") or a.get("cover_big"),
+                    f'{a["artist"]["name"]} - {a["title"]}')
+    return None, None
+
+
+def candidates(folder):
+    ta, tb = tags_of(folder)
+    fa, fb = from_folder_name(folder)
+    out = []
+    for pair in ((ta, tb), (fa, fb), (ta, simplify(tb)), (fa, simplify(fb))):
+        if pair[0] and pair[1] and pair not in out:
+            out.append(pair)
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser(add_help=False)
+    ap.add_argument("--fetch", action="store_true")
+    ap.add_argument("--retry", action="store_true")
+    ap.add_argument("--undo", action="store_true", help="delete the folder.jpg files this wrote")
+    ap.add_argument("-n", type=int, default=0, help="stop after N downloads")
+    ap.add_argument("-h", "--help", action="store_true")
+    args = ap.parse_args()
+    if args.help:
+        print(__doc__)
+        return
+
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    cache = {}
+    if os.path.exists(CACHE):
+        try:
+            cache = json.load(open(CACHE))
+        except Exception:
+            cache = {}
+
+    if args.undo:
+        gone = 0
+        for folder, state in list(cache.items()):
+            if state != "ok":
+                continue
+            dest = os.path.join(folder, "folder.jpg")
+            if os.path.exists(dest):
+                os.remove(dest)
+                gone += 1
+            del cache[folder]
+        json.dump(cache, open(CACHE, "w"))
+        print(f"removed {gone} covers written by music-art")
+        return
+
+    missing = album_folders()
+    if not args.fetch:
+        tried = sum(1 for f, _ in missing if cache.get(f) == "notfound")
+        print(f"{len(missing)} folders without art ({sum(n for _, n in missing)} tracks)")
+        if tried:
+            print(f"  {tried} of them already searched without a match")
+        print("\nrun 'music-art --fetch' to download what can be found")
+        return
+
+    todo = [
+        (f, n) for f, n in missing
+        if args.retry or cache.get(f) != "notfound"
+    ]
+    print(f"{len(todo)} folders to try")
+    found = failed = 0
+    for folder, _n in todo:
+        label = os.path.basename(folder)[:56]
+        url = matched = None
+        for artist, album in candidates(folder):
+            url, matched = deezer(artist, album)
+            if url:
+                break
+            time.sleep(0.2)
+        if not url:
+            cache[folder] = "notfound"
+            failed += 1
+            print(f"  --  {label}")
+        else:
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": UA})
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    data = r.read()
+                dest = os.path.join(folder, "folder.jpg")
+                tmp = dest + ".tmp"
+                with open(tmp, "wb") as fh:
+                    fh.write(data)
+                os.replace(tmp, dest)
+                cache[folder] = "ok"
+                found += 1
+                print(f"  ok  {label}\n        matched: {matched}")
+            except Exception as e:
+                cache[folder] = "notfound"
+                failed += 1
+                print(f"  !!  {label}: {e}")
+        json.dump(cache, open(CACHE, "w"))
+        if args.n and found >= args.n:
+            print(f"\nstopping at {args.n} downloads as asked")
+            break
+        time.sleep(0.3)
+
+    print(f"\n{found} covers written, {failed} not found")
+    if failed:
+        print("Folders that find nothing are usually compilations, bootlegs or")
+        print("rips with no real album — 'music-art --retry' tries them again.")
+
+
+if __name__ == "__main__":
+    main()

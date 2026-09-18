@@ -50,6 +50,12 @@ should hold credentials that reach anything else.
 The bar's play button shuffles the whole library; right-click it (or `Super+M`)
 to search and play anything. `Super+N` skips.
 
+`bin/music-art` fills in missing album art as `folder.jpg`, matching the name
+the library already uses. It only ever adds — never touches an audio file, skips
+folders that already have art, and `music-art --undo` removes everything it
+wrote. Compilations, bootlegs and "Unknown Album" folders are deliberately left
+alone: a confidently wrong cover is worse than none.
+
 Tauon exposes no MPRIS TrackList or Playlists interface, so it cannot be told
 "play my library". `bin/music-index` reads tags with mutagen into
 `~/.cache/dots/music.json` (a few seconds for ~2900 tracks) and the bar plays
