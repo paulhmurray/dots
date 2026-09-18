@@ -1,3 +1,5 @@
+# Credentials: a stored git token, recreated in a minute, never worth backing up
+.git-credentials
 # Caches and regenerable state
 .cache/
 .npm/

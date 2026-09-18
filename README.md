@@ -11,8 +11,32 @@ Arch + Hyprland + Quickshell. One repo, every machine.
 3. Reboot. **Before anything else:** `blkid` — root must say `TYPE="crypto_LUKS"`.
    If it says btrfs, archinstall skipped encryption; reinstall.
 4. Connect wifi: `nmcli device wifi connect "SSID" password "..."`
-5. `git clone git@github.com:USER/dots.git ~/dots && ~/dots/install.sh`
+5. `git clone https://github.com/paulhmurray/dots.git ~/dots && ~/dots/install.sh`
+   HTTPS on purpose: the repo is public, so cloning needs no credentials and a brand new
+   machine does not need an SSH key before it can fetch the repo that sets it up.
 6. `~/dots/theme/apply.sh` then log out and back in on tty1.
+
+Pulling stays anonymous forever. Pushing needs auth once — see Committing below.
+
+## Committing from a new machine
+
+Reads are anonymous; only writes need credentials. One-time setup:
+
+1. Create a fine-grained token at <https://github.com/settings/personal-access-tokens>,
+   scoped to **this repository only**, permission **Contents: Read and write**.
+2. `dots auth` — sets `credential.helper=store` for this repo only, not globally,
+   so no other repo on the machine starts saving credentials.
+3. Push once. Git asks for a username and password: give the username and paste the
+   token as the password. It is saved to `~/.git-credentials` and never asked again.
+
+The token is stored in the clear there, so `docs/backup-excludes.txt` keeps that file
+out of backups. Losing it costs nothing — make another token.
+
+`dots add <pkg>` then commits and pushes on its own with no prompt.
+
+Scoped deliberately: a token limited to this repo can only ever touch this repo. Do not
+use an account-wide token or an SSH key here — this repo is public and nothing in it
+should hold credentials that reach anything else.
 
 ## Layout
 

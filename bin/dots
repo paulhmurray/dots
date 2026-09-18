@@ -19,6 +19,7 @@ usage: dots <command>
   sync             pull, then do only what the changed files require
   add <pkg>        upgrade, install, record in a list, commit and push
   upgrade          yay -Syu, then say whether a reboot is needed
+  auth             set this machine up to push (one time, needs a token)
 
 status only reads: no sudo, no fetch, no pacman transaction.
 sync, add and upgrade are interactive by design — an upgrade always stops at
@@ -41,6 +42,57 @@ cmd_upgrade() {
         echo "    Reboot needed: the running system no longer matches what is on disk."
         diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") \
             | grep '^>' | sed 's/^> /      /'
+    fi
+}
+
+# --- auth ------------------------------------------------------------------
+# Reading this repo is anonymous; only pushing needs a credential. Printed
+# rather than automated: the token has to be created in a browser, and this
+# repo should not be in the business of handling credentials on your behalf.
+auth_help() {
+    cat <<'EOF'
+
+To push from this machine, once:
+
+  1. Create a token at https://github.com/settings/personal-access-tokens
+     Repository access: only  paulhmurray/dots
+     Permissions:       Contents -> Read and write
+
+  2. dots auth
+
+  3. Push once. Git asks for a username and password: give your GitHub
+     username, and paste the token as the password. It is saved and you
+     will not be asked again.
+
+Scope it to this repository. An account-wide token, or an SSH key, would give
+whoever obtained it far more than a public dotfiles repo.
+EOF
+}
+
+cmd_auth() {
+    cd "$DOTS"
+    local url
+    url=$(git remote get-url origin 2>/dev/null || true)
+    case "$url" in
+        https://*) ;;
+        *)  echo "origin is '$url', not https — run install.sh first." >&2
+            return 1 ;;
+    esac
+
+    # Repo-local on purpose: a global credential.helper would apply to every
+    # repo on the machine, including work ones.
+    if [ -z "$(git config --local --get credential.helper || true)" ]; then
+        git config --local credential.helper store
+        echo "==> credential.helper=store, for this repo only"
+    else
+        echo "==> credential helper already set: $(git config --local --get credential.helper)"
+    fi
+
+    if [ -f "$HOME/.git-credentials" ] && grep -q 'github\.com' "$HOME/.git-credentials" 2>/dev/null; then
+        echo "==> A github.com credential is already stored; push should just work."
+    else
+        echo "    No github.com credential stored yet."
+        auth_help
     fi
 }
 
@@ -199,8 +251,12 @@ cmd_add() {
     if git push -q 2>/dev/null; then
         echo "==> Pushed"
     else
-        echo "    Committed but not pushed. 'dots status' will show you as ahead;"
-        echo "    push when you are back online." >&2
+        echo "    Committed, but the push failed. 'dots status' will show this" >&2
+        echo "    machine as ahead until it lands." >&2
+        if [ -z "$(git config --local --get credential.helper || true)" ]; then
+            echo "    This machine has no push credential set up yet." >&2
+            auth_help >&2
+        fi
     fi
 }
 
@@ -272,6 +328,7 @@ case "${1:-}" in
     sync)    shift; cmd_sync "$@" ;;
     add)     shift; cmd_add "$@" ;;
     upgrade) shift; cmd_upgrade "$@" ;;
+    auth)    shift; cmd_auth "$@" ;;
     -h|--help|help|"") usage ;;
     *) echo "dots: unknown command '$1'" >&2; usage >&2; exit 2 ;;
 esac

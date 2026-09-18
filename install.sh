@@ -55,6 +55,20 @@ mkdir -p "$HOME/.local/bin"
 ln -sfn "$DOTS/bin/dots" "$HOME/.local/bin/dots"
 echo "    linked dots"
 
+echo "==> Remote"
+# HTTPS, not SSH: reading a public repo needs no credentials, so the status
+# timer can fetch with nobody present. An SSH remote would need a passphrase
+# or an agent, and this repo has no business touching ~/.ssh. Pushing uses a
+# repo-scoped token instead — see "Committing from a new machine" in README.
+# Only the URL we know about is rewritten, so a fork keeps its own remote.
+case "$(git -C "$DOTS" remote get-url origin 2>/dev/null || true)" in
+    git@github.com:paulhmurray/dots.git|ssh://git@github.com/paulhmurray/dots.git)
+        git -C "$DOTS" remote set-url origin https://github.com/paulhmurray/dots.git
+        echo "    origin switched to https"
+        ;;
+    *) echo "    origin left as is" ;;
+esac
+
 echo "==> System scripts"
 for s in "$DOTS"/scripts/*.sh; do "$s"; done
 
