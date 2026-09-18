@@ -298,14 +298,27 @@ cmd_add() {
 }
 
 cmd_status() {
-    local json=0 write=0
+    local json=0 write=0 fetch=0 stale=false
     for arg in "$@"; do
         case "$arg" in
             --json)  json=1 ;;
             --write) write=1 ;;
+            --fetch) fetch=1 ;;
             *) echo "dots status: unknown option $arg" >&2; return 2 ;;
         esac
     done
+
+    # Only the timer asks for this. It is a read of a public repo over https,
+    # so it needs no credentials and cannot prompt; a laptop that is simply
+    # offline reports stale rather than failing.
+    # Bounded on purpose. A dead gateway or a captive portal does not refuse
+    # the connection, it swallows it: an unroutable address hangs for well over
+    # a minute, which on the laptop would mean a stuck service every half hour.
+    # Failing fast and reporting stale is the useful answer.
+    if [ "$fetch" = 1 ]; then
+        timeout 20 env GIT_TERMINAL_PROMPT=0 git -C "$DOTS" fetch -q 2>/dev/null \
+            || stale=true
+    fi
 
     local behind ahead drift aur_drift dirty
     IFS=$'\t' read -r behind ahead < <(dots_behind_ahead)
@@ -324,9 +337,10 @@ cmd_status() {
             --argjson drift "$(printf '%s' "$drift" | jq -R -s 'split("\n") | map(select(length > 0))')" \
             --argjson aur_drift "$(printf '%s' "$aur_drift" | jq -R -s 'split("\n") | map(select(length > 0))')" \
             --arg     checked_at "$(date -Is)" \
+            --argjson stale "$stale" \
             '{host: $host, theme: $theme, behind: $behind, ahead: $ahead,
               dirty: $dirty, drift: $drift, aur_drift: $aur_drift,
-              checked_at: $checked_at,
+              checked_at: $checked_at, stale: $stale,
               clean: (($behind + $ahead) == 0 and ($dirty | length) == 0
                       and ($drift | length) == 0 and ($aur_drift | length) == 0)}')
         if [ "$write" = 1 ]; then

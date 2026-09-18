@@ -1,0 +1,14 @@
+[Unit]
+Description=Record how far this machine has drifted from the dots repo
+Documentation=https://github.com/paulhmurray/dots
+
+[Service]
+Type=oneshot
+# Reads only: a fetch of a public repo over https, pacman -Q, and git status.
+# It writes one file, ~/.cache/dots/status.json, and nothing else. It must
+# never apply anything: install.sh uses sudo and can rebuild the initramfs,
+# and nothing on a timer may do that.
+ExecStart=%h/.local/bin/dots status --fetch --write
+# Backstop. dots bounds its own fetch at 20s; this catches anything else that
+# wedges, so a half-hourly timer can never leave a service hanging.
+TimeoutStartSec=60

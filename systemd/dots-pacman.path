@@ -1,0 +1,12 @@
+[Unit]
+Description=Notice packages installed outside the dots lists
+Documentation=https://github.com/paulhmurray/dots
+
+[Path]
+# pacman writes one directory per package here, so this fires whenever
+# anything is installed or removed, however it was installed.
+PathChanged=/var/lib/pacman/local
+Unit=dots-status-local.service
+
+[Install]
+WantedBy=paths.target

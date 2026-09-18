@@ -69,6 +69,18 @@ case "$(git -C "$DOTS" remote get-url origin 2>/dev/null || true)" in
     *) echo "    origin left as is" ;;
 esac
 
+echo "==> Services"
+# User units, not system ones: they run as you, need no sudo, and only ever
+# write ~/.cache/dots/status.json. Detection is automatic; applying anything
+# stays a deliberate click.
+mkdir -p "$HOME/.config/systemd/user"
+for u in "$DOTS"/systemd/*; do
+    ln -sfn "$u" "$HOME/.config/systemd/user/$(basename "$u")"
+done
+systemctl --user daemon-reload
+systemctl --user enable --now dots-status.timer dots-pacman.path
+echo "    dots-status.timer, dots-pacman.path"
+
 echo "==> System scripts"
 for s in "$DOTS"/scripts/*.sh; do "$s"; done
 

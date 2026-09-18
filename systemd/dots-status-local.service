@@ -1,0 +1,9 @@
+[Unit]
+Description=Re-check dots drift after a pacman transaction
+Documentation=https://github.com/paulhmurray/dots
+
+[Service]
+Type=oneshot
+# No --fetch: this fires once per package during a transaction, so a 19-package
+# upgrade would otherwise mean 19 trips to a mirror. Local checks only.
+ExecStart=%h/.local/bin/dots status --write
