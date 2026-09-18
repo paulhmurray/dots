@@ -16,9 +16,192 @@ usage: dots <command>
   status --json    the same, as JSON
   status --write   write the JSON to ~/.cache/dots/status.json
 
-status only reads. It does not fetch, so it reports the state as of the last
-fetch; nothing here needs sudo or changes the system.
+  sync             pull, then do only what the changed files require
+  add <pkg>        upgrade, install, record in a list, commit and push
+  upgrade          yay -Syu, then say whether a reboot is needed
+
+status only reads: no sudo, no fetch, no pacman transaction.
+sync, add and upgrade are interactive by design — an upgrade always stops at
+its [Y/n] so you can see a kernel bump coming.
 EOF
+}
+
+# --- upgrade ---------------------------------------------------------------
+# yay rather than pacman: pacman -Syu never touches AUR packages, so the AUR
+# half of the machine would silently rot. Interactive on purpose — no
+# --noconfirm here, unlike install.sh, which installs a list you already chose.
+cmd_upgrade() {
+    local before after
+    before=$(dots_reboot_watch)
+    echo "==> Full system upgrade (repo + AUR)"
+    yay -Syu
+    after=$(dots_reboot_watch)
+    if [ "$before" != "$after" ]; then
+        echo
+        echo "    Reboot needed: the running system no longer matches what is on disk."
+        diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") \
+            | grep '^>' | sed 's/^> /      /'
+    fi
+}
+
+# --- sync ------------------------------------------------------------------
+cmd_sync() {
+    cd "$DOTS"
+
+    # Derived files block a fast-forward whenever two machines sit on different
+    # themes, which is the normal case here. They are regenerated below.
+    git checkout -- "${DOTS_GENERATED[@]}" 2>/dev/null || true
+
+    # Everything still modified, self-writing files included: git refuses a
+    # fast-forward over any of them, whatever the reason they changed.
+    local blocking
+    blocking=$(dots_dirty_all)
+    if [ -n "$blocking" ]; then
+        echo "Uncommitted changes would be overwritten by a pull:" >&2
+        sed 's/^/    /' <<<"$blocking" >&2
+        if grep -qxF dotfiles/nvim/lazy-lock.json <<<"$blocking"; then
+            echo >&2
+            echo "    lazy-lock.json is nvim's plugin lockfile; it changes whenever" >&2
+            echo "    Lazy updates a plugin. Commit it to keep this machine's plugin" >&2
+            echo "    versions, or discard it to take the other machine's:" >&2
+            echo "        git -C ~/dots checkout -- dotfiles/nvim/lazy-lock.json" >&2
+        fi
+        echo >&2
+        echo "Commit or discard them, then run dots sync again." >&2
+        return 1
+    fi
+
+    local before after changed
+    before=$(git rev-parse HEAD)
+    echo "==> Pulling"
+    git pull --ff-only
+    after=$(git rev-parse HEAD)
+
+    if [ "$before" = "$after" ]; then
+        echo "==> Already up to date"
+        # The theme files were just discarded; put them back before leaving.
+        "$DOTS/theme/apply.sh" >/dev/null 2>&1 || true
+        return 0
+    fi
+
+    changed=$(git diff --name-only "$before" "$after")
+    echo "==> $(wc -l <<<"$changed") file(s) changed"
+
+    local needs_install=0 needs_theme=0 needs_reload=0
+    while read -r f; do
+        case "$f" in
+            packages/*|hosts/*|scripts/*|systemd/*|install.sh) needs_install=1 ;;
+            theme/*)    needs_theme=1 ;;
+            dotfiles/*) needs_reload=1 ;;
+        esac
+    done <<<"$changed"
+
+    # install.sh runs pacman -S against whatever the database currently holds.
+    # On a stale database that is either a 404 or, worse, a partial upgrade, so
+    # the upgrade is a prerequisite of this branch and only this branch.
+    if [ "$needs_install" = 1 ]; then
+        cmd_upgrade
+        echo "==> Running install.sh"
+        "$DOTS/install.sh"
+    fi
+
+    # Bare, so the machine keeps its own theme. A palette edit upstream reaches
+    # this machine through here.
+    if [ "$needs_theme" = 1 ] || [ "$needs_install" = 1 ]; then
+        echo "==> Applying theme"
+        "$DOTS/theme/apply.sh"
+    elif [ "$needs_reload" = 1 ]; then
+        echo "==> Reloading Hyprland and quickshell"
+        hyprctl reload >/dev/null 2>&1 || true
+        pkill quickshell 2>/dev/null || true
+        setsid quickshell >/dev/null 2>&1 &
+        "$DOTS/theme/apply.sh" >/dev/null 2>&1 || true
+    else
+        "$DOTS/theme/apply.sh" >/dev/null 2>&1 || true
+    fi
+
+    echo "==> Done"
+}
+
+# --- add -------------------------------------------------------------------
+# install.sh reads these lists with an unquoted $(cat), so a file that does not
+# end in a newline would glue the new name onto the last one and hand pacman a
+# package that does not exist.
+append_pkg() {
+    local file="$1" pkg="$2"
+    if [ -s "$file" ] && [ -n "$(tail -c1 "$file")" ]; then
+        printf '\n' >> "$file"
+    fi
+    printf '%s\n' "$pkg" >> "$file"
+}
+
+cmd_add() {
+    local pkg="" list=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --desktop|--system|--dev|--aur) list="${1#--}" ;;
+            --host) list=host ;;
+            -*) echo "dots add: unknown option $1" >&2; return 2 ;;
+            *)  pkg="$1" ;;
+        esac
+        shift
+    done
+    [ -n "$pkg" ] || { echo "usage: dots add <package> [--dev|--system|--desktop|--aur|--host]" >&2; return 2; }
+
+    cd "$DOTS"
+
+    if grep -qxF "$pkg" <(dots_declared); then
+        echo "$pkg is already declared — nothing to do."
+        return 0
+    fi
+
+    # Where it comes from decides which list it may go in.
+    local from_aur=0
+    if pacman -Si "$pkg" >/dev/null 2>&1; then
+        from_aur=0
+    elif yay -Si "$pkg" >/dev/null 2>&1; then
+        from_aur=1
+        echo "==> $pkg is an AUR package"
+        list=aur
+    else
+        echo "dots add: no package called '$pkg' in the repos or the AUR" >&2
+        return 1
+    fi
+
+    if [ -z "$list" ]; then
+        echo "Which list should $pkg go in?"
+        local opts=(desktop system dev host)
+        select choice in "${opts[@]}"; do
+            [ -n "${choice:-}" ] && { list="$choice"; break; }
+        done
+    fi
+
+    local file
+    case "$list" in
+        host) file="$DOTS/hosts/$(dots_host)/packages.txt" ;;
+        *)    file="$DOTS/packages/$list.txt" ;;
+    esac
+    [ -f "$file" ] || { echo "dots add: no such list: $file" >&2; return 1; }
+
+    cmd_upgrade
+    echo "==> Installing $pkg"
+    if [ "$from_aur" = 1 ]; then
+        yay -S --needed "$pkg"
+    else
+        sudo pacman -S --needed "$pkg"
+    fi
+
+    append_pkg "$file" "$pkg"
+    echo "==> Recorded in ${file#"$DOTS"/}"
+
+    git add "$file"
+    git commit -q -m "packages: add $pkg"
+    if git push -q 2>/dev/null; then
+        echo "==> Pushed"
+    else
+        echo "    Committed but not pushed. 'dots status' will show you as ahead;"
+        echo "    push when you are back online." >&2
+    fi
 }
 
 cmd_status() {
@@ -85,7 +268,10 @@ cmd_status() {
 }
 
 case "${1:-}" in
-    status) shift; cmd_status "$@" ;;
+    status)  shift; cmd_status "$@" ;;
+    sync)    shift; cmd_sync "$@" ;;
+    add)     shift; cmd_add "$@" ;;
+    upgrade) shift; cmd_upgrade "$@" ;;
     -h|--help|help|"") usage ;;
     *) echo "dots: unknown command '$1'" >&2; usage >&2; exit 2 ;;
 esac

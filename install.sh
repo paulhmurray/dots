@@ -50,6 +50,11 @@ for f in "$DOTS"/home/.[!.]*; do
     echo "    linked $name"
 done
 
+echo "==> Command"
+mkdir -p "$HOME/.local/bin"
+ln -sfn "$DOTS/bin/dots" "$HOME/.local/bin/dots"
+echo "    linked dots"
+
 echo "==> System scripts"
 for s in "$DOTS"/scripts/*.sh; do "$s"; done
 

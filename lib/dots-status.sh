@@ -13,6 +13,29 @@ DOTS_SELF_WRITING=(
     dotfiles/nvim/lazy-lock.json
 )
 
+# Files theme/apply.sh generates into tracked paths. They are derived from the
+# palette, so discarding them loses nothing — which is what lets `dots sync`
+# clear them before pulling. Without that, two machines on different themes can
+# never fast-forward: every one of these differs, permanently.
+DOTS_GENERATED=(
+    dotfiles/hypr/colours.conf
+    dotfiles/hypr/hyprlock.conf
+    dotfiles/foot/foot.ini
+    dotfiles/quickshell/Colours.qml
+    dotfiles/mako/config
+    dotfiles/tmux/colours.conf
+    dotfiles/nvim/lua/theme.lua
+    dotfiles/zathura/zathurarc
+)
+
+# Packages whose upgrade means the running system no longer matches what is on
+# disk. The 18 Sep upgrade here bumped amd-ucode, linux-firmware and mesa and
+# would have reported nothing under a linux/nvidia/systemd-only list.
+dots_reboot_watch() {
+    pacman -Q 2>/dev/null | grep -E \
+        '^(linux|linux-lts|linux-zen|linux-hardened|linux-firmware[^ ]*|nvidia[^ ]*|systemd|amd-ucode|intel-ucode|mesa|aquamarine) '
+}
+
 # Read package lists exactly as install.sh does: unquoted $(cat), so every
 # whitespace-separated word is a package name. Keeps this check honest for
 # lists that put several packages on one line, as desktop.txt does.
@@ -59,9 +82,21 @@ dots_behind_ahead() {
         || printf '0\t0\n'
 }
 
-# Uncommitted changes, minus the files above. Paths only, one per line.
+# Two different questions, deliberately two functions.
+#
+# dots_dirty is "is there anything I should be nagged about?" — it drops the
+# self-writing files, so a plugin update does not light the bar indicator.
+#
+# dots_dirty_all is "is there anything that will stop a fast-forward?" — it
+# drops nothing, because git does not care why a file is modified. Using the
+# first for the second means sync hits a raw git error on exactly the files it
+# claimed to have handled.
+dots_dirty_all() {
+    git -C "$DOTS" status --porcelain --untracked-files=no 2>/dev/null | cut -c4-
+}
+
 dots_dirty() {
-    git -C "$DOTS" status --porcelain 2>/dev/null | cut -c4- | while read -r f; do
+    dots_dirty_all | while read -r f; do
         for skip in "${DOTS_SELF_WRITING[@]}"; do
             [ "$f" = "$skip" ] && continue 2
         done

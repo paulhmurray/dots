@@ -12,7 +12,8 @@ export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"
 alias ls='ls --color=auto'
 alias ll='ls -la'
 alias grep='grep --color=auto'
-alias dots='cd ~/dots'
+# not 'dots': that name belongs to bin/dots, and an alias would shadow it
+alias cdd='cd ~/dots'
 alias theme='~/dots/theme/apply.sh'
 
 # path in accent colour, git branch dimmed, prompt on its own line
