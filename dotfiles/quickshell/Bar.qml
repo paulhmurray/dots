@@ -191,6 +191,46 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: 14
 
+        // Two deliberately different things. The dot is a notifier: it appears
+        // only when this machine differs from the repo. The arrow below is a
+        // launcher: always there, never lit, because on Arch there are always
+        // updates and a permanently lit icon means nothing.
+        Hover {
+            id: syncItem
+            visible: !Sync.clean
+            label: Sync.summary + "\n\nclick: dots sync"
+            onClicked: Quickshell.execDetached(["foot", "-e", "dots", "sync"])
+            // Colour by what is wrong, not by how fresh the check is. A stale
+            // check still reports real local drift, so dimming it would hide
+            // something true; the tooltip says the check could not reach
+            // GitHub instead.
+            Icon {
+                text: "󰓦"
+                color: Sync.behind > 0 ? Colours.accent : Colours.yellow
+            }
+            Rectangle {
+                visible: Sync.count > 0
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                width: 13; height: 13; radius: 7
+                color: Colours.accent
+                Text {
+                    anchors.centerIn: parent
+                    text: Sync.count > 9 ? "9+" : Sync.count
+                    color: Colours.bg
+                    font.family: Colours.font
+                    font.pixelSize: 8
+                    font.bold: true
+                }
+            }
+        }
+
+        Hover {
+            label: "System upgrade  (repo + AUR)\n\nclick: dots upgrade"
+            onClicked: Quickshell.execDetached(["foot", "-e", "dots", "upgrade"])
+            Icon { text: "󰚰"; color: Colours.dim }
+        }
+
         Hover {
             label: "Keybindings  (Super + /)"
             onClicked: Quickshell.execDetached(["qs", "ipc", "call", "keybinds", "toggle"])
