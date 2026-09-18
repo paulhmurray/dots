@@ -11,3 +11,5 @@ Themes 1.0 Themes.qml
 singleton Pomodoro 1.0 Pomodoro.qml
 Keybinds 1.0 Keybinds.qml
 singleton Sync 1.0 Sync.qml
+singleton Music 1.0 Music.qml
+MusicPanel 1.0 MusicPanel.qml

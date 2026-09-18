@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""Index ~/Music into ~/.cache/dots/music.json for the bar's music panel.
+
+Tauon keeps its own library, but exposes no MPRIS TrackList or Playlists
+interface, so there is no way to ask it what exists. We read the tags
+ourselves. mutagen does this in one process — ffprobe would be a subprocess
+per file, which is about two minutes for this library rather than seconds.
+"""
+import json
+import os
+import sys
+
+try:
+    from mutagen import File as MutagenFile
+except ImportError:
+    sys.exit("music-index: python-mutagen is not installed (pacman -S python-mutagen)")
+
+MUSIC = os.path.expanduser(os.environ.get("MUSIC_DIR", "~/Music"))
+CACHE = os.path.join(
+    os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "dots"
+)
+OUT = os.path.join(CACHE, "music.json")
+EXTS = {".mp3", ".flac", ".m4a", ".ogg", ".opus", ".wav", ".wma", ".aac"}
+
+
+def first(tags, *keys):
+    for k in keys:
+        v = tags.get(k)
+        if v:
+            return str(v[0]) if isinstance(v, list) else str(v)
+    return ""
+
+
+def main():
+    if not os.path.isdir(MUSIC):
+        sys.exit(f"music-index: no such directory: {MUSIC}")
+
+    tracks, skipped = [], 0
+    for root, _dirs, files in os.walk(MUSIC):
+        for name in files:
+            if os.path.splitext(name)[1].lower() not in EXTS:
+                continue
+            path = os.path.join(root, name)
+            try:
+                audio = MutagenFile(path, easy=True)
+            except Exception:
+                audio = None
+            if audio is None:
+                skipped += 1
+                continue
+            tags = audio.tags or {}
+            title = first(tags, "title") or os.path.splitext(name)[0]
+            tracks.append(
+                {
+                    "p": path,
+                    "t": title,
+                    "a": first(tags, "artist", "albumartist"),
+                    "b": first(tags, "album"),
+                    # Pre-lowered haystack: the panel filters on every keystroke
+                    # over a few thousand rows, and doing it here means QML never
+                    # lowercases the same strings again.
+                    "s": " ".join(
+                        (title, first(tags, "artist", "albumartist"), first(tags, "album"))
+                    ).lower(),
+                }
+            )
+
+    # Untagged files last. Sorting by artist alone puts everything with no
+    # artist tag at the very top, which is the first thing the panel shows.
+    tracks.sort(key=lambda t: (t["a"] == "", t["a"].lower(), t["b"].lower(), t["t"].lower()))
+    os.makedirs(CACHE, exist_ok=True)
+    tmp = OUT + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(tracks, f, separators=(",", ":"))
+    os.replace(tmp, OUT)  # atomic: the bar may be reading it
+
+    print(f"indexed {len(tracks)} tracks -> {OUT}" + (f" ({skipped} unreadable)" if skipped else ""))
+
+
+if __name__ == "__main__":
+    main()

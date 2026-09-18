@@ -14,6 +14,7 @@ ShellRoot {
     Osd {}
     Themes {}
     Keybinds {}
+    MusicPanel {}
 
     IpcHandler {
         target: "pomodoro"

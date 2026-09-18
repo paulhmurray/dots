@@ -151,13 +151,25 @@ PanelWindow {
             Icon { text: Weather.icon; color: Colours.dim }
         }
 
+        // Left-click: play/pause, or shuffle the whole library when nothing is
+        // going. Right-click: the search panel. Hover stays passive — a panel
+        // that opens on hover cannot hold a search box.
         Hover {
             id: np
-            property var player: Mpris.players.values.find(p => p.isPlaying) ?? Mpris.players.values[0] ?? null
-            visible: player !== null
-            label: player ? (player.trackTitle || "Unknown") + (player.trackArtist ? " — " + player.trackArtist : "") : ""
-            onClicked: if (player) player.togglePlaying()
-            Icon { text: np.player && np.player.isPlaying ? "󰏤" : "󰐊"; color: Colours.accent }
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            label: Music.playing && Music.nowTitle !== ""
+                   ? Music.nowTitle + (Music.nowArtist ? "\n" + Music.nowArtist : "")
+                     + "\n\nclick: pause   right-click: search"
+                   : "Shuffle " + (Music.ready ? Music.tracks.length + " tracks" : "library")
+                     + "\n\nclick: play   right-click: search"
+            onClicked: (mouse) => {
+                if (mouse.button === Qt.RightButton) Quickshell.execDetached(["qs", "ipc", "call", "music", "toggle"]);
+                else Music.toggle();
+            }
+            Icon {
+                text: Music.playing ? "󰏤" : "󰐊"
+                color: Music.playing ? Colours.accent : Colours.dim
+            }
         }
     }
 

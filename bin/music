@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Talks to Tauon over MPRIS for the bar's music controls.
+#
+# Everything D-Bus lives here rather than in QML, so it can be tested from a
+# terminal and so the bar never has to care whether Tauon is running. Tauon
+# exited twice unprompted while this was being built and the cause was never
+# reproduced, so every command starts by making sure it is there.
+set -euo pipefail
+
+DEST=org.mpris.MediaPlayer2.tauon
+OBJ=/org/mpris/MediaPlayer2
+IFACE=org.mpris.MediaPlayer2.Player
+
+running() { busctl --user list 2>/dev/null | grep -q "$DEST"; }
+
+# Start Tauon if its bus name is absent and wait for it to appear. Returns
+# non-zero rather than hanging if it never does.
+ensure() {
+    running && return 0
+    setsid tauon >/dev/null 2>&1 &
+    for _ in $(seq 1 30); do
+        sleep 0.5
+        running && return 0
+    done
+    echo "music: tauon did not appear on the bus" >&2
+    return 1
+}
+
+call() { timeout 6 busctl --user call "$DEST" "$OBJ" "$IFACE" "$@" >/dev/null; }
+get()  { timeout 6 busctl --user get-property "$DEST" "$OBJ" "$IFACE" "$1" 2>/dev/null; }
+
+status() { get PlaybackStatus | sed 's/^s "//; s/"$//'; }
+
+case "${1:-}" in
+    ensure)  ensure ;;
+    status)  running && status || echo "Offline" ;;
+
+    # Plays immediately AND appends to Tauon's playlist. There is no way to
+    # enqueue without playing, which is why the bar feeds one track at a time
+    # rather than seeding a queue up front.
+    play)
+        [ -n "${2:-}" ] || { echo "usage: music play <file>" >&2; exit 2; }
+        ensure
+        call OpenUri v s "file://$2"
+        ;;
+
+    toggle)
+        ensure
+        call PlayPause
+        ;;
+
+    pause) ensure; call Pause ;;
+
+    # Deliberately not MPRIS Next: with a short playlist that is the call that
+    # crashed Tauon during testing. The bar supplies the next track itself.
+    shuffle-on)  ensure; timeout 6 busctl --user set-property "$DEST" "$OBJ" "$IFACE" Shuffle b true ;;
+    shuffle-off) ensure; timeout 6 busctl --user set-property "$DEST" "$OBJ" "$IFACE" Shuffle b false ;;
+
+    raise) ensure; timeout 6 busctl --user call "$DEST" "$OBJ" org.mpris.MediaPlayer2 Raise >/dev/null ;;
+
+    *)
+        cat <<'EOF'
+usage: music <command>
+
+  ensure           start Tauon if it is not already on the bus
+  status           Playing / Paused / Stopped / Offline
+  play <file>      play that file now
+  toggle           play/pause
+  pause            pause
+  shuffle-on|-off  Tauon's own shuffle flag
+  raise            bring the Tauon window up
+
+The track index is built separately by music-index.
+EOF
+        exit 2 ;;
+esac

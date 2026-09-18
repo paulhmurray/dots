@@ -97,8 +97,19 @@ done
 
 echo "==> Command"
 mkdir -p "$HOME/.local/bin"
-ln -sfn "$DOTS/bin/dots" "$HOME/.local/bin/dots"
-echo "    linked dots"
+for b in "$DOTS"/bin/*; do
+    ln -sfn "$b" "$HOME/.local/bin/$(basename "$b")"
+    echo "    linked $(basename "$b")"
+done
+
+echo "==> Music index"
+# Guarded: a fresh machine may have no library yet, and an empty index is not
+# a reason to fail an install.
+if [ -d "$HOME/Music" ]; then
+    "$DOTS/bin/music-index" || echo "    index failed — run music-index by hand"
+else
+    echo "    no ~/Music yet, skipping"
+fi
 
 echo "==> Hooks"
 # Per clone, so a fork or a fresh machine gets the secret scan without anyone

@@ -45,6 +45,17 @@ should hold credentials that reach anything else.
 - `~/.config/dots/location` — one line, the city for the weather widget. Without it
   wttr.in geolocates by IP, which follows a laptop but resolves to the ISP's city.
 
+## Music
+
+The bar's play button shuffles the whole library; right-click it (or `Super+M`)
+to search and play anything. `Super+N` skips.
+
+Tauon exposes no MPRIS TrackList or Playlists interface, so it cannot be told
+"play my library". `bin/music-index` reads tags with mutagen into
+`~/.cache/dots/music.json` (a few seconds for ~2900 tracks) and the bar plays
+one track at a time over MPRIS `OpenUri`, handing over just before each track
+ends. Re-run `music-index` after adding music.
+
 ## Layout
 
 - `packages/`  pacman lists (desktop, system, dev) and `aur.txt`
