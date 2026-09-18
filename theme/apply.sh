@@ -6,7 +6,7 @@
 # the machine with no colours at all — nvim's init.lua does require("theme"),
 # and Hyprland and quickshell both error on a missing file.
 set -euo pipefail
-DOTS="$HOME/dots"
+DOTS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # With no argument, keep the theme this machine already chose. The theme is a
 # per-machine choice and is not repo state, so defaulting to a fixed name would
@@ -22,6 +22,11 @@ fi
 source "$DOTS/theme/$THEME.sh"
 
 # ---- write everything ----------------------------------------------------
+# Every directory, because four of these files are the only tracked thing in
+# theirs — foot, mako, nvim/lua and zathura simply do not exist in a fresh
+# clone now that the generated files are untracked.
+mkdir -p "$DOTS"/dotfiles/{hypr,foot,quickshell,mako,tmux,zathura} \
+         "$DOTS/dotfiles/nvim/lua"
 
 cat > "$DOTS/dotfiles/hypr/colours.conf" << CONF
 \$bg = rgb($BG)
@@ -94,7 +99,6 @@ input-field {
 }
 LOCK
 
-mkdir -p "$DOTS/dotfiles/mako"
 cat > "$DOTS/dotfiles/mako/config" << MAKO
 font=JetBrainsMono Nerd Font 11
 background-color=#$BG
@@ -120,7 +124,6 @@ set -g pane-active-border-style "fg=#$ACCENT"
 set -g message-style "bg=#$SURFACE,fg=#$FG"
 TMUX
 
-mkdir -p "$DOTS/dotfiles/nvim/lua"
 echo "return \"$NVIM\"" > "$DOTS/dotfiles/nvim/lua/theme.lua"
 
 cat > "$DOTS/dotfiles/zathura/zathurarc" << ZATH

@@ -31,9 +31,13 @@ DOTS_GENERATED=(
 # Packages whose upgrade means the running system no longer matches what is on
 # disk. The 18 Sep upgrade here bumped amd-ucode, linux-firmware and mesa and
 # would have reported nothing under a linux/nvidia/systemd-only list.
+# The || true matters: grep exits 1 when nothing matches, and this runs inside
+# a command substitution under set -euo pipefail, so an empty result would kill
+# the upgrade rather than report "nothing worth rebooting for".
 dots_reboot_watch() {
     pacman -Q 2>/dev/null | grep -E \
-        '^(linux|linux-lts|linux-zen|linux-hardened|linux-firmware[^ ]*|nvidia[^ ]*|systemd|amd-ucode|intel-ucode|mesa|aquamarine) '
+        '^(linux|linux-lts|linux-zen|linux-hardened|linux-firmware[^ ]*|nvidia[^ ]*|systemd|amd-ucode|intel-ucode|mesa|aquamarine) ' \
+        || true
 }
 
 # Read package lists exactly as install.sh does: unquoted $(cat), so every

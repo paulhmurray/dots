@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # set a random wallpaper for the current (or given) theme; solid colour if none
 set -euo pipefail
-DOTS="$HOME/dots"
+DOTS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 THEME="${1:-$(cat ~/.config/current-theme 2>/dev/null || echo mocha)}"
 source "$DOTS/theme/$THEME.sh"
 pkill swaybg || true

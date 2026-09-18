@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-DOTS="$HOME/dots"
+# The repo this script lives in, not a hardcoded ~/dots: bin/dots,
+# scripts/hardware.sh and theme/apply.sh all resolve themselves the same way,
+# so a clone anywhere works instead of silently operating on a path that may
+# not exist.
+DOTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Host selection, most explicit wins:  ./install.sh <name>  >  DOTS_HOST=<name>
 # >  /etc/hostname.  A machine with no hosts/ folder is a supported case, not an
@@ -32,6 +36,14 @@ else
     echo "monitor = , preferred, auto, 1" > "$DOTS/dotfiles/hypr/host.conf"
     NO_HOST=1
 fi
+
+echo "==> Theme"
+# Before the symlinks, not after. The generated colour files are untracked, so
+# on a fresh clone dotfiles/{foot,mako,zathura} and nvim/lua do not exist at
+# all — apply.sh is what creates them, and the loop below only links
+# directories that are already there. Bare, so an existing machine keeps the
+# theme it chose; a new one gets mocha.
+"$DOTS/theme/apply.sh"
 
 echo "==> Dotfiles"
 mkdir -p "$HOME/.config"
@@ -95,8 +107,17 @@ echo "==> Verifying"
 for bin in Hyprland foot quickshell nvim; do
     command -v "$bin" >/dev/null || { echo "MISSING: $bin"; exit 1; }
 done
-for f in host.conf hardware.conf; do
+for f in host.conf hardware.conf colours.conf; do
     [ -f "$DOTS/dotfiles/hypr/$f" ] || { echo "MISSING: dotfiles/hypr/$f"; exit 1; }
+done
+# The generated set, none of it tracked: if apply.sh failed, say so here rather
+# than leaving Hyprland with a dangling source and nvim unable to require().
+for f in foot/foot.ini quickshell/Colours.qml mako/config tmux/colours.conf \
+         nvim/lua/theme.lua zathura/zathurarc; do
+    [ -f "$DOTS/dotfiles/$f" ] || { echo "MISSING: dotfiles/$f — theme/apply.sh did not finish"; exit 1; }
+done
+for d in "$HOME"/.config/{foot,mako,zathura}; do
+    [ -e "$d" ] || { echo "MISSING: $d"; exit 1; }
 done
 
 echo "==> Done"
