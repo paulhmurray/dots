@@ -48,9 +48,19 @@ GPUS=$(lspci -nn -d ::0300; lspci -nn -d ::0302) || true
 
 if grep -q '\[10de:' <<<"$GPUS"; then
     echo "==> NVIDIA detected"
-    # DKMS needs headers for whichever kernel is installed.
-    KERNEL=$(pacman -Qqs '^linux(-zen|-lts|-hardened)?$' | head -1 || true)
-    [ -n "$KERNEL" ] && PKGS+=("$KERNEL-headers")
+    # DKMS builds against EVERY installed kernel, so each needs its headers.
+    # The old version took head -1 of the match, which on a machine with a
+    # fallback kernel installed headers for whichever sorted first and left the
+    # other booting without an nvidia module. Match names exactly too: -Qqs
+    # searches descriptions as well as names.
+    mapfile -t KERNELS < <(pacman -Qq \
+        | grep -xE 'linux(-lts|-zen|-hardened|-rt|-rt-lts)?' || true)
+    if [ ${#KERNELS[@]} -eq 0 ]; then
+        echo "    no kernel package matched — headers not added, DKMS will fail"
+    else
+        echo "    kernels: ${KERNELS[*]}"
+        for k in "${KERNELS[@]}"; do PKGS+=("$k-headers"); done
+    fi
     PKGS+=(nvidia-open-dkms nvidia-utils libva-nvidia-driver egl-wayland)
     # lib32-nvidia-utils needs multilib; skip rather than fail the whole run.
     if grep -q '^\[multilib\]' /etc/pacman.conf; then
