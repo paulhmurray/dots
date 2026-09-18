@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Keeps this machine and the dots repo in step. See README.
+set -euo pipefail
+
+# Resolve through the symlink in ~/.local/bin back to the repo it lives in.
+DOTS="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+export DOTS
+# shellcheck source=../lib/dots-status.sh
+source "$DOTS/lib/dots-status.sh"
+
+usage() {
+    cat <<'EOF'
+usage: dots <command>
+
+  status           what differs between this machine and the repo
+  status --json    the same, as JSON
+  status --write   write the JSON to ~/.cache/dots/status.json
+
+status only reads. It does not fetch, so it reports the state as of the last
+fetch; nothing here needs sudo or changes the system.
+EOF
+}
+
+cmd_status() {
+    local json=0 write=0
+    for arg in "$@"; do
+        case "$arg" in
+            --json)  json=1 ;;
+            --write) write=1 ;;
+            *) echo "dots status: unknown option $arg" >&2; return 2 ;;
+        esac
+    done
+
+    local behind ahead drift aur_drift dirty
+    IFS=$'\t' read -r behind ahead < <(dots_behind_ahead)
+    drift=$(dots_drift)
+    aur_drift=$(dots_aur_drift)
+    dirty=$(dots_dirty)
+
+    if [ "$json" = 1 ] || [ "$write" = 1 ]; then
+        local doc
+        doc=$(jq -n \
+            --argjson behind "$behind" \
+            --argjson ahead "$ahead" \
+            --arg     theme "$(dots_theme)" \
+            --arg     host "$(dots_host)" \
+            --argjson dirty "$(printf '%s' "$dirty" | jq -R -s 'split("\n") | map(select(length > 0))')" \
+            --argjson drift "$(printf '%s' "$drift" | jq -R -s 'split("\n") | map(select(length > 0))')" \
+            --argjson aur_drift "$(printf '%s' "$aur_drift" | jq -R -s 'split("\n") | map(select(length > 0))')" \
+            --arg     checked_at "$(date -Is)" \
+            '{host: $host, theme: $theme, behind: $behind, ahead: $ahead,
+              dirty: $dirty, drift: $drift, aur_drift: $aur_drift,
+              checked_at: $checked_at,
+              clean: (($behind + $ahead) == 0 and ($dirty | length) == 0
+                      and ($drift | length) == 0 and ($aur_drift | length) == 0)}')
+        if [ "$write" = 1 ]; then
+            mkdir -p "$DOTS_CACHE"
+            printf '%s\n' "$doc" > "$DOTS_CACHE/status.json"
+        fi
+        [ "$json" = 1 ] && printf '%s\n' "$doc"
+        return 0
+    fi
+
+    # Human output. Silence is the goal: every line below is something to act on.
+    local said=0
+    [ "$behind" -gt 0 ] && { echo "behind    $behind commit(s) — dots sync"; said=1; }
+    [ "$ahead"  -gt 0 ] && { echo "ahead     $ahead commit(s) not pushed"; said=1; }
+    if [ -n "$dirty" ]; then
+        echo "dirty     $(wc -l <<<"$dirty") uncommitted file(s)"
+        sed 's/^/            /' <<<"$dirty"
+        said=1
+    fi
+    if [ -n "$drift" ]; then
+        echo "drift     $(wc -l <<<"$drift") package(s) installed but in no list"
+        tr '\n' ' ' <<<"$drift" | fold -s -w 64 | sed 's/^/            /'
+        said=1
+    fi
+    if [ -n "$aur_drift" ]; then
+        echo "aur       $(wc -l <<<"$aur_drift") AUR package(s) in no list"
+        tr '\n' ' ' <<<"$aur_drift" | fold -s -w 64 | sed 's/^/            /'
+        said=1
+    fi
+    [ "$said" = 0 ] && echo "up to date   ($(dots_host), theme $(dots_theme))"
+    return 0
+}
+
+case "${1:-}" in
+    status) shift; cmd_status "$@" ;;
+    -h|--help|help|"") usage ;;
+    *) echo "dots: unknown command '$1'" >&2; usage >&2; exit 2 ;;
+esac

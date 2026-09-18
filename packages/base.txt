@@ -1,0 +1,17 @@
+base
+base-devel
+efibootmgr
+git
+gst-plugin-pipewire
+libpulse
+linux
+linux-firmware
+mkinitcpio
+networkmanager
+pipewire
+pipewire-alsa
+pipewire-jack
+sudo
+vim
+wpa_supplicant
+zram-generator
