@@ -85,7 +85,10 @@ PanelWindow {
         }
 
         Repeater {
-            model: Hyprland.workspaces
+            // Special workspaces (the music scratchpad) have negative ids and
+            // are not places you switch between, so they do not belong in the
+            // list — otherwise showing Tauon adds a "-98" to the bar.
+            model: Hyprland.workspaces.values.filter(w => w.id > 0)
             Hover {
                 required property var modelData
                 id: ws

@@ -15,27 +15,12 @@ running() { busctl --user list 2>/dev/null | grep -q "$DEST"; }
 
 # Start Tauon if its bus name is absent and wait for it to appear. Returns
 # non-zero rather than hanging if it never does.
-# Hyprland shows a special workspace when a window opens on it, and focuses
-# that window. Clicking play in the bar must not throw Tauon over your work, so
-# a launch tucks the scratchpad away again.
-hide_scratchpad_if_shown() {
-    command -v hyprctl >/dev/null || return 0
-    local shown
-    shown=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].specialWorkspace.name // ""')
-    [ "$shown" = "special:music" ] || return 0
-    hyprctl dispatch togglespecialworkspace music >/dev/null 2>&1 || true
-}
-
 ensure() {
     running && return 0
     setsid tauon >/dev/null 2>&1 &
     for _ in $(seq 1 30); do
         sleep 0.5
-        if running; then
-            sleep 0.7          # let the window map before hiding it
-            hide_scratchpad_if_shown
-            return 0
-        fi
+        running && return 0
     done
     echo "music: tauon did not appear on the bus" >&2
     return 1
