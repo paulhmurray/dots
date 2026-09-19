@@ -1,0 +1,13 @@
+[Unit]
+Description=Check unread mail for the bar
+Documentation=https://github.com/paulhmurray/dots
+
+[Service]
+Type=oneshot
+# Reads one IMAP folder status and writes ~/.cache/dots/mail.json. Opens the
+# mailbox readonly, so it can never mark anything as read.
+ExecStart=%h/.local/bin/mail-count
+# The credential file may be missing or the network down; neither is a failure
+# worth logging every two minutes. mail-count records the problem in the JSON.
+SuccessExitStatus=1
+TimeoutStartSec=60

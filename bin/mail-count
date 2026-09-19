@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""Count unread mail over IMAP and write it where the bar can read it.
+
+Deliberately independent of Thunderbird: it has its own credential and its own
+connection, so the count is right whether or not the mail client is running,
+and a Thunderbird upgrade cannot change the format underneath it. That costs
+one more credential, which is the trade that was chosen.
+
+Credentials live in ~/.config/dots/mail-account, mode 0600, never in the repo:
+
+    host=imap.gmail.com
+    user=you@gmail.com
+    pass=abcd efgh ijkl mnop        # a Google app password, not your password
+
+Only ever reads: the mailbox is opened readonly, so nothing is marked seen.
+"""
+import imaplib
+import json
+import os
+import sys
+from datetime import datetime, timezone
+
+CONF = os.path.join(
+    os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "dots", "mail-account"
+)
+CACHE_DIR = os.path.join(
+    os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "dots"
+)
+OUT = os.path.join(CACHE_DIR, "mail.json")
+
+
+def read_conf():
+    if not os.path.exists(CONF):
+        return None
+    conf = {}
+    with open(CONF) as f:
+        for line in f:
+            line = line.split("#", 1)[0].strip()
+            if "=" in line:
+                k, v = line.split("=", 1)
+                conf[k.strip()] = v.strip()
+    return conf
+
+
+def write(doc):
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    tmp = OUT + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(doc, f)
+    os.replace(tmp, OUT)
+
+
+def main():
+    now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    conf = read_conf()
+    if not conf or not conf.get("user") or not conf.get("pass"):
+        write({"unread": 0, "ok": False, "error": "no credentials", "checked_at": now})
+        sys.exit(f"mail-count: no usable credentials in {CONF}")
+
+    host = conf.get("host", "imap.gmail.com")
+    folder = conf.get("folder", "INBOX")
+    try:
+        with imaplib.IMAP4_SSL(host, timeout=20) as m:
+            m.login(conf["user"], conf["pass"])
+            # STATUS rather than SELECT + SEARCH: one round trip, and it cannot
+            # mark anything read even by accident.
+            typ, data = m.status(folder, "(UNSEEN)")
+            if typ != "OK":
+                raise RuntimeError(f"STATUS returned {typ}")
+            # b'INBOX (UNSEEN 3)'
+            text = data[0].decode()
+            unread = int(text.rsplit("UNSEEN", 1)[1].strip(" ()"))
+    except Exception as e:
+        # Keep the last good count rather than flashing zero when the wifi
+        # drops; the bar shows staleness instead.
+        previous = 0
+        if os.path.exists(OUT):
+            try:
+                previous = json.load(open(OUT)).get("unread", 0)
+            except Exception:
+                pass
+        write({"unread": previous, "ok": False,
+               "error": type(e).__name__, "checked_at": now})
+        sys.exit(f"mail-count: {type(e).__name__}: {e}")
+
+    write({"unread": unread, "ok": True, "error": "", "checked_at": now})
+    if sys.stdout.isatty():
+        print(f"{unread} unread in {folder}")
+
+
+if __name__ == "__main__":
+    main()

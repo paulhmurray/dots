@@ -38,12 +38,30 @@ Scoped deliberately: a token limited to this repo can only ever touch this repo.
 use an account-wide token or an SSH key here — this repo is public and nothing in it
 should hold credentials that reach anything else.
 
+## Mail
+
+Thunderbird on the `special:mail` scratchpad — `Super+I` shows and hides it, so
+it runs in the background and never takes a workspace. Its own notifications are
+off; the bar's envelope carries an unread count instead, and nothing else
+interrupts.
+
+`theme/apply.sh` writes `userChrome.css` into the Thunderbird profile, so the
+mail client follows the machine's theme like everything else. It needs a
+Thunderbird restart to take effect.
+
+The unread count comes from `bin/mail-count`, which reads IMAP directly with its
+own app password rather than asking Thunderbird — so it is right whether
+Thunderbird is running or not, and a Thunderbird upgrade cannot break it. Run
+`mail setup` once to create the credential file.
+
 ## Machine-local, never committed
 
 - `~/.bashrc.local` — anything naming hosts, IPs or secrets; sourced by `home/.bashrc`
 - `~/.config/current-theme` — which theme this machine chose
 - `~/.config/dots/location` — one line, the city for the weather widget. Without it
   wttr.in geolocates by IP, which follows a laptop but resolves to the ISP's city.
+- `~/.config/dots/mail-account` — IMAP host, address and app password for the
+  unread count. Mode 0600. `mail setup` creates it.
 
 ## Music
 

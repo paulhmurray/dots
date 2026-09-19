@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# Show and hide the mail client, and keep the unread count fresh.
+#
+# Thunderbird lives on the special:mail scratchpad, so it runs in the
+# background and never takes one of the numbered workspaces. Same shape as
+# bin/music, for the same reasons.
+set -euo pipefail
+
+CLASS='^(org\.mozilla\.Thunderbird)$'
+DOTS="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/dots/mail-account"
+
+running() { pgrep -x thunderbird >/dev/null 2>&1; }
+
+ensure() {
+    running && return 0
+    setsid thunderbird >/dev/null 2>&1 &
+    for _ in $(seq 1 40); do
+        sleep 0.5
+        running && return 0
+    done
+    echo "mail: thunderbird did not start" >&2
+    return 1
+}
+
+case "${1:-}" in
+    ensure) ensure ;;
+
+    # Show or hide it over whatever you are doing. The window rule opens it
+    # silently, so this is the only thing that ever brings it into view.
+    window)
+        ensure
+        if command -v hyprctl >/dev/null; then
+            hyprctl dispatch togglespecialworkspace mail >/dev/null 2>&1 || true
+        fi
+        ;;
+
+    count)  "$DOTS/bin/mail-count" ;;
+
+    # Where Thunderbird keeps its profile. The directory name is random, and
+    # Thunderbird 155 moved it from ~/.thunderbird to ~/.config/thunderbird, so
+    # theme/apply.sh asks rather than guesses. The profile an install actually
+    # uses is the one its [Install...] section names, which is not necessarily
+    # the one flagged Default=1.
+    profile)
+        python3 - <<'PYEOF'
+import configparser, os, sys
+base = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "thunderbird")
+ini = os.path.join(base, "profiles.ini")
+if not os.path.exists(ini):
+    sys.exit(1)
+c = configparser.ConfigParser()
+c.read(ini)
+chosen = None
+for s in c.sections():                       # the install's own default
+    if s.startswith("Install") and c.has_option(s, "Default"):
+        chosen = c.get(s, "Default"); break
+if not chosen:                               # else whatever claims Default=1
+    for s in c.sections():
+        if c.has_option(s, "Default") and c.get(s, "Default") == "1" and c.has_option(s, "Path"):
+            chosen = c.get(s, "Path"); break
+if not chosen:                               # else the only one there is
+    paths = [c.get(s, "Path") for s in c.sections() if c.has_option(s, "Path")]
+    if len(paths) == 1:
+        chosen = paths[0]
+if not chosen:
+    sys.exit(1)
+print(os.path.join(base, chosen))
+PYEOF
+        ;;
+
+    # Preferences this setup depends on. Idempotent: each is appended only if
+    # absent, so hand edits elsewhere in user.js survive.
+    prefs)
+        prof=$("$0" profile 2>/dev/null || true)
+        [ -n "$prof" ] && [ -d "$prof" ] || { echo "mail: no Thunderbird profile yet" >&2; exit 1; }
+        js="$prof/user.js"; touch "$js"
+        add() { grep -qF "$1" "$js" || printf 'user_pref("%s", %s);\n' "$1" "$2" >> "$js"; }
+        # userChrome.css does nothing without this.
+        add "toolkit.legacyUserProfileCustomizations.stylesheets" true
+        # No popups and no sound: the bar's unread count is the only notice
+        # wanted, and a toast on every message is the thing being avoided.
+        add "mail.biff.show_alert"        false
+        add "mail.biff.play_sound"        false
+        add "mail.biff.show_tray_icon"    false
+        add "mail.biff.use_system_alert"  false
+        echo "wrote $js"
+        ;;
+
+    # One-time setup. Printed rather than automated: the app password has to be
+    # created in a browser, and this file is the one thing here holding a
+    # credential.
+    setup)
+        mkdir -p "$(dirname "$CONF")"
+        if [ -f "$CONF" ]; then
+            echo "$CONF already exists; edit it by hand to change the account."
+            exit 0
+        fi
+        cat > "$CONF" <<'EOF'
+host=imap.gmail.com
+user=CHANGEME@gmail.com
+pass=CHANGEME
+folder=INBOX
+EOF
+        chmod 600 "$CONF"
+        cat <<EOF
+Wrote $CONF (mode 0600).
+
+Now:
+  1. Turn on 2-step verification on your Google account if it is not already.
+  2. Create an app password at https://myaccount.google.com/apppasswords
+     Google will show 16 characters in four groups.
+  3. Put your address and that app password into the file above.
+  4. Check it with:  mail count
+
+This is separate from the OAuth login Thunderbird uses. It exists so the
+unread count works even when Thunderbird is closed, and so a Thunderbird
+upgrade cannot break it.
+EOF
+        ;;
+
+    *)
+        cat <<'EOF'
+usage: mail <command>
+
+  window     show/hide the mail window over your work
+  ensure     start Thunderbird if it is not running
+  count      check unread now and update the bar
+  setup      create the credentials file and explain the app password
+  profile    print Thunderbird's profile directory
+  prefs      apply the prefs this setup needs (no popups, custom CSS on)
+EOF
+        exit 2 ;;
+esac

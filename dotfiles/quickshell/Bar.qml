@@ -154,6 +154,33 @@ PanelWindow {
             Icon { text: Weather.icon; color: Colours.dim }
         }
 
+        // Mail: no notifications, no popups — just a count when there is one.
+        // Dim and quiet at zero, so an empty inbox is not something to look at.
+        Hover {
+            id: mailItem
+            label: Mail.summary + "\n\nclick: open mail"
+            onClicked: Quickshell.execDetached(["mail", "window"])
+            Icon {
+                text: Mail.unread > 0 ? "󰇮" : "󰇯"
+                color: Mail.unread > 0 ? Colours.accent : Colours.dim
+            }
+            Rectangle {
+                visible: Mail.unread > 0
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                width: 13; height: 13; radius: 7
+                color: Colours.accent
+                Text {
+                    anchors.centerIn: parent
+                    text: Mail.unread > 9 ? "9+" : Mail.unread
+                    color: Colours.bg
+                    font.family: Colours.font
+                    font.pixelSize: 8
+                    font.bold: true
+                }
+            }
+        }
+
         // Left-click: play/pause, or shuffle the whole library when nothing is
         // going. Right-click: the search panel. Hover stays passive — a panel
         // that opens on hover cannot hold a search box.
