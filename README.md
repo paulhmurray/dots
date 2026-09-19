@@ -48,7 +48,9 @@ should hold credentials that reach anything else.
 ## Music
 
 The bar's play button shuffles the whole library; right-click it (or `Super+M`)
-to search and play anything. `Super+N` skips.
+to search and play anything. `Super+N` skips. `Super+Shift+M` shows and hides
+Tauon itself over whatever you are doing — it lives on a scratchpad, so it never
+takes one of the nine workspaces and never moves you off the one you are on.
 
 `bin/music-art` fills in missing album art as `folder.jpg`, matching the name
 the library already uses. It only ever adds — never touches an audio file, skips
