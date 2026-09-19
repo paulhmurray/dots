@@ -36,7 +36,8 @@ PanelWindow {
                         MonBrightnessDown: "Brightness down",
                         AudioRaiseVolume: "Volume up", AudioLowerVolume: "Volume down",
                         AudioMute: "Mute", AudioPlay: "Play", AudioNext: "Next",
-                        AudioPrev: "Previous"
+                        AudioPrev: "Previous",
+                        "mouse:272": "Left-drag", "mouse:273": "Right-drag"
                     };
                     const raw = parts[1].replace("XF86", "");
                     const key = nicer[raw] ?? raw.replace(/^([a-z])/, c => c.toUpperCase());
