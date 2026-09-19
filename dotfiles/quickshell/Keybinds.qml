@@ -7,7 +7,10 @@ PanelWindow {
     id: win
     visible: false
     implicitWidth: 620
-    implicitHeight: 560
+    // Tall enough for every binding, so a cheatsheet does not need scrolling —
+    // but never taller than the screen it is on, for the laptop's sake.
+    implicitHeight: Math.min(win.binds.length * 28 + 60,
+                             (screen ? screen.height : 900) - 120)
     exclusiveZone: 0
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -26,13 +29,45 @@ PanelWindow {
                     const parts = rhs.split(",").map(s => s.trim());
                     const mods = parts[0].replace("$mod", "Super").replace("SHIFT", "Shift")
                         .replace("CTRL", "Ctrl").replace("ALT", "Alt").split(" ").filter(s => s);
-                    const key = parts[1].replace("XF86", "").replace(/^([a-z])/, c => c.toUpperCase());
+                    // Hyprland's key names are not what anyone calls these keys.
+                    const nicer = {
+                        RETURN: "Enter", SPACE: "Space", ESCAPE: "Esc", SLASH: "/",
+                        PRINT: "PrtSc", MonBrightnessUp: "Brightness up",
+                        MonBrightnessDown: "Brightness down",
+                        AudioRaiseVolume: "Volume up", AudioLowerVolume: "Volume down",
+                        AudioMute: "Mute", AudioPlay: "Play", AudioNext: "Next",
+                        AudioPrev: "Previous"
+                    };
+                    const raw = parts[1].replace("XF86", "");
+                    const key = nicer[raw] ?? raw.replace(/^([a-z])/, c => c.toUpperCase());
                     const combo = [...mods, key].join(" + ");
                     const desc = comment ? comment.trim()
                         : parts[2] === "exec" ? parts.slice(3).join(",").replace("$term", "terminal")
                         : parts.slice(2).join(" ");
                     return { combo: combo, desc: desc };
                 });
+
+                // Collapse runs that differ only by a trailing number, so the
+                // nine workspace binds read as one line instead of burying
+                // everything below them under eighteen near-identical rows.
+                const rolled = [];
+                for (const b of win.binds) {
+                    const m = b.desc.match(/^(.*?) (\d+)$/);
+                    const prev = rolled[rolled.length - 1];
+                    if (m && prev && prev._stem === m[1]) {
+                        prev._last = m[2];
+                        prev.combo = prev._first + "…" + m[2];
+                        prev.desc = m[1];
+                        continue;
+                    }
+                    if (m) {
+                        rolled.push({ combo: b.combo, desc: b.desc, _stem: m[1],
+                                      _first: b.combo, _last: m[2] });
+                    } else {
+                        rolled.push({ combo: b.combo, desc: b.desc });
+                    }
+                }
+                win.binds = rolled;
             }
         }
     }
