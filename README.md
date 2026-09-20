@@ -40,7 +40,7 @@ should hold credentials that reach anything else.
 
 ## Mail
 
-Thunderbird on the `special:mail` scratchpad — `Super+I` shows and hides it, so
+Thunderbird on the `special:mail` scratchpad — `Super+E` shows and hides it, so
 it runs in the background and never takes a workspace. Its own notifications are
 off; the bar's envelope carries an unread count instead, and nothing else
 interrupts.
