@@ -98,3 +98,10 @@ map("<leader>q", "<cmd>q<cr>", "Quit")
 map("<leader>e", "<cmd>Explore<cr>", "File explorer")
 map("<leader>?", "<cmd>WhichKey<cr>", "All keymaps")
 map("<Esc>", "<cmd>nohlsearch<cr>", "Clear search")
+
+-- jk leaves insert mode, the habit carried over from evil-escape in Doom.
+-- Also mapped in terminal mode, where <Esc> is usually swallowed by the shell.
+-- timeoutlen is 400 above, which is what keeps the pause after a lone "j"
+-- short enough not to notice.
+vim.keymap.set("i", "jk", "<Esc>", { desc = "Exit insert mode" })
+vim.keymap.set("t", "jk", [[<C-\><C-n>]], { desc = "Exit terminal mode" })
