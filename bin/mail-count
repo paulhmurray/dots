@@ -21,12 +21,18 @@ One section per account:
 A file with no sections is read as a single account, so the original flat
 format still works.
 
+An account may use passcmd instead of pass, so the file holds no secret at all
+and can be copied between machines safely:
+
+    passcmd=pass show mail/you@gmail.com
+
 Only ever reads: mailboxes are opened with STATUS, so nothing is marked seen.
 """
 import configparser
 import imaplib
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 
@@ -53,21 +59,40 @@ def accounts():
     out = []
     for name in parser.sections():
         s = parser[name]
-        if not s.get("user") or not s.get("pass"):
+        if not s.get("user") or not (s.get("pass") or s.get("passcmd")):
             continue
         out.append({
             "name": name,
             "host": s.get("host", "imap.gmail.com"),
             "user": s.get("user"),
             "pass": s.get("pass"),
+            "passcmd": s.get("passcmd"),
             "folder": s.get("folder", "INBOX"),
         })
     return out
 
 
+def password(acct):
+    """The account's password, from the file or from a command.
+
+    passcmd exists so the credential file need not hold the secret at all:
+        passcmd=pass show mail/paulhughmurray
+    That makes the file safe to carry between machines, which a file with the
+    password in it is not. Plain pass= still works and needs nothing installed.
+    """
+    if acct.get("passcmd"):
+        out = subprocess.run(acct["passcmd"], shell=True, capture_output=True,
+                             text=True, timeout=30)
+        if out.returncode != 0:
+            raise RuntimeError(f"passcmd failed: {out.stderr.strip()[:80]}")
+        # `pass show` prints the password on the first line.
+        return out.stdout.splitlines()[0].strip()
+    return acct["pass"]
+
+
 def unread_for(acct):
     with imaplib.IMAP4_SSL(acct["host"], timeout=20) as m:
-        m.login(acct["user"], acct["pass"])
+        m.login(acct["user"], password(acct))
         # STATUS rather than SELECT + SEARCH: one round trip, and it cannot
         # mark anything read even by accident.
         typ, data = m.status(acct["folder"], "(UNSEEN)")

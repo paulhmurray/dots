@@ -112,6 +112,17 @@ cmd_sync() {
     # themes, which is the normal case here. They are regenerated below.
     git checkout -- "${DOTS_GENERATED[@]}" 2>/dev/null || true
 
+    # lazy-lock.json changes whenever nvim updates a plugin, so on any machine
+    # that is not the one you drive it blocks every pull. Both machines are
+    # meant to run identical plugin versions, and the repo is the authority on
+    # what those are, so take the repo's copy — but only when it is the sole
+    # thing in the way, and say so rather than doing it quietly.
+    local lock=dotfiles/nvim/lazy-lock.json
+    if [ "$(dots_dirty_all)" = "$lock" ]; then
+        echo "==> Discarding local $lock (taking the repo's plugin versions)"
+        git checkout -- "$lock" 2>/dev/null || true
+    fi
+
     # Everything still modified, self-writing files included: git refuses a
     # fast-forward over any of them, whatever the reason they changed.
     local blocking

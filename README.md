@@ -61,7 +61,10 @@ Thunderbird is running or not, and a Thunderbird upgrade cannot break it. Run
 - `~/.config/dots/location` — one line, the city for the weather widget. Without it
   wttr.in geolocates by IP, which follows a laptop but resolves to the ISP's city.
 - `~/.config/dots/mail-account` — IMAP host, address and app password for the
-  unread count. Mode 0600. `mail setup` creates it.
+  unread count. Mode 0600. `mail setup` creates it. It is per machine and never
+  committed: a public repo cannot hold a credential. An account can use
+  `passcmd=pass show mail/you@gmail.com` instead of `pass=`, which leaves no
+  secret in the file.
 
 ## Music
 
