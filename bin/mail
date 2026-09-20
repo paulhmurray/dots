@@ -80,10 +80,18 @@ PYEOF
         add "toolkit.legacyUserProfileCustomizations.stylesheets" true
         # No popups and no sound: the bar's unread count is the only notice
         # wanted, and a toast on every message is the thing being avoided.
-        add "mail.biff.show_alert"        false
-        add "mail.biff.play_sound"        false
-        add "mail.biff.show_tray_icon"    false
-        add "mail.biff.use_system_alert"  false
+        add "mail.biff.show_alert"           false
+        add "mail.biff.play_sound"           false
+        add "mail.biff.show_tray_icon"       false
+        add "mail.biff.use_system_alert"     false
+        add "mail.biff.alert.show_preview"   false
+        add "mail.biff.alert.show_subject"   false
+        add "mail.biff.alert.show_sender"    false
+        add "mail.biff.animate_dock_icon"    false
+        # Calendar is part of Thunderbird, and its alarms are a separate popup.
+        add "calendar.alarms.show"           false
+        add "calendar.alarms.showmissed"     false
+        add "calendar.alarms.playsound"      false
         echo "wrote $js"
         ;;
 

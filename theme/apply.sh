@@ -109,6 +109,16 @@ border-radius=6
 default-timeout=5000
 anchor=top-right
 margin=10
+
+# Mail is deliberately silent: the bar's unread count is the only notice
+# wanted. Thunderbird's own prefs are set too (see bin/mail prefs); this is the
+# backstop, so a Thunderbird update that resets a pref cannot start
+# interrupting you.
+[app-name="Thunderbird"]
+invisible=1
+
+[desktop-entry="thunderbird"]
+invisible=1
 MAKO
 
 cat > "$DOTS/dotfiles/tmux/colours.conf" << TMUX
