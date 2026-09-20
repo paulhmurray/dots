@@ -28,6 +28,18 @@ case "${1:-}" in
 
     # Show or hide it over whatever you are doing. The window rule opens it
     # silently, so this is the only thing that ever brings it into view.
+    # Always bring it into view, never hide it. This is what the launcher and
+    # the desktop entry use: picking Thunderbird from a launcher must show it,
+    # whereas Super+E toggles.
+    show)
+        ensure
+        if command -v hyprctl >/dev/null; then
+            shown=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].specialWorkspace.name // ""')
+            [ "$shown" = "special:mail" ] || hyprctl dispatch togglespecialworkspace mail >/dev/null 2>&1 || true
+            hyprctl dispatch focuswindow "class:$CLASS" >/dev/null 2>&1 || true
+        fi
+        ;;
+
     window)
         ensure
         if command -v hyprctl >/dev/null; then
@@ -78,6 +90,10 @@ PYEOF
         add() { grep -qF "$1" "$js" || printf 'user_pref("%s", %s);\n' "$1" "$2" >> "$js"; }
         # userChrome.css does nothing without this.
         add "toolkit.legacyUserProfileCustomizations.stylesheets" true
+        # Dark chrome, so Thunderbird is internally consistent before any
+        # tinting. Painting individual containers over the light theme is what
+        # produced dark-on-dark text and a dark folder pane beside light panes.
+        add "ui.systemUsesDarkTheme" 1
         # No popups and no sound: the bar's unread count is the only notice
         # wanted, and a toast on every message is the thing being avoided.
         add "mail.biff.show_alert"           false
@@ -143,6 +159,7 @@ EOF
 usage: mail <command>
 
   window     show/hide the mail window over your work
+  show       bring it into view (never hides) — used by the launcher
   ensure     start Thunderbird if it is not running
   count      check unread now and update the bar
   setup      create the credentials file and explain the app password

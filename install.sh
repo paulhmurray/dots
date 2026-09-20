@@ -111,6 +111,20 @@ else
     echo "    no ~/Music yet, skipping"
 fi
 
+echo "==> Desktop entries"
+# Overrides for launcher entries, e.g. routing Thunderbird through `mail show`
+# so picking it from the launcher brings the scratchpad into view instead of
+# opening a window you cannot see.
+if [ -d "$DOTS/desktop" ]; then
+    mkdir -p "$HOME/.local/share/applications"
+    for d in "$DOTS"/desktop/*.desktop; do
+        [ -e "$d" ] || continue
+        ln -sfn "$d" "$HOME/.local/share/applications/$(basename "$d")"
+        echo "    linked $(basename "$d")"
+    done
+    update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+fi
+
 echo "==> Hooks"
 # Per clone, so a fork or a fresh machine gets the secret scan without anyone
 # remembering to turn it on.

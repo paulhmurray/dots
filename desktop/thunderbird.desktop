@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Thunderbird
+GenericName=Email
+Comment=Mail on the scratchpad — Super+E toggles it
+Exec=mail show
+Icon=thunderbird
+Terminal=false
+Categories=Network;Email;
+StartupNotify=false
