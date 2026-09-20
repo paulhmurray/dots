@@ -12,18 +12,27 @@ import QtQuick
 Singleton {
     id: root
 
-    property int  unread: 0
-    property bool ok: true          // false once a check has failed
+    property int  unread: 0          // total across every account
+    property bool ok: true           // false once a check has failed
     property string error: ""
     property string checkedAt: ""
+    property var accounts: []        // one row per account, for the tooltip
 
     readonly property string summary: {
-        if (!ok && error === "no credentials")
+        if (error === "no credentials")
             return "Mail not set up yet\nrun: mail setup";
-        const n = unread === 0 ? "No unread mail"
-                : unread === 1 ? "1 unread message"
-                : unread + " unread messages";
-        return ok ? n : n + "\n(last check failed: " + error + ")";
+        const total = unread === 0 ? "No unread mail"
+                    : unread === 1 ? "1 unread message"
+                    : unread + " unread messages";
+        // With more than one account the total alone is not much use — which
+        // inbox it is in decides whether you care.
+        const lines = [total];
+        if (accounts.length > 1) {
+            for (const a of accounts)
+                lines.push("  " + a.unread + "  " + a.user + (a.ok ? "" : "  (check failed)"));
+        }
+        if (!ok && error !== "") lines.push("(" + error + ")");
+        return lines.join("\n");
     }
 
     FileView {
@@ -39,6 +48,7 @@ Singleton {
                 root.ok        = d.ok ?? false;
                 root.error     = d.error ?? "";
                 root.checkedAt = d.checked_at ?? "";
+                root.accounts  = d.accounts ?? [];
             } catch (e) {
                 console.log("Mail: could not parse mail.json:", e);
             }

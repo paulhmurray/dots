@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 """Count unread mail over IMAP and write it where the bar can read it.
 
-Deliberately independent of Thunderbird: it has its own credential and its own
+Deliberately independent of Thunderbird: its own credentials, its own
 connection, so the count is right whether or not the mail client is running,
-and a Thunderbird upgrade cannot change the format underneath it. That costs
-one more credential, which is the trade that was chosen.
+and a Thunderbird upgrade cannot change the format underneath it.
 
-Credentials live in ~/.config/dots/mail-account, mode 0600, never in the repo:
+Credentials live in ~/.config/dots/mail-account, mode 0600, never in the repo.
+One section per account:
 
+    [main]
     host=imap.gmail.com
     user=you@gmail.com
-    pass=abcd efgh ijkl mnop        # a Google app password, not your password
+    pass=abcd efgh ijkl mnop     # a Google app password, not your password
+    folder=INBOX
 
-Only ever reads: the mailbox is opened readonly, so nothing is marked seen.
+    [old]
+    user=other@gmail.com
+    pass=...
+
+A file with no sections is read as a single account, so the original flat
+format still works.
+
+Only ever reads: mailboxes are opened with STATUS, so nothing is marked seen.
 """
+import configparser
 import imaplib
 import json
 import os
@@ -29,17 +39,50 @@ CACHE_DIR = os.path.join(
 OUT = os.path.join(CACHE_DIR, "mail.json")
 
 
-def read_conf():
+def accounts():
+    """Every account in the config, newest format or old flat one."""
     if not os.path.exists(CONF):
-        return None
-    conf = {}
-    with open(CONF) as f:
-        for line in f:
-            line = line.split("#", 1)[0].strip()
-            if "=" in line:
-                k, v = line.split("=", 1)
-                conf[k.strip()] = v.strip()
-    return conf
+        return []
+    raw = open(CONF).read()
+    parser = configparser.ConfigParser()
+    if "[" in raw.split("#")[0] or raw.lstrip().startswith("["):
+        parser.read_string(raw)
+    else:
+        # Flat file: treat the whole thing as one account called "mail".
+        parser.read_string("[mail]\n" + raw)
+    out = []
+    for name in parser.sections():
+        s = parser[name]
+        if not s.get("user") or not s.get("pass"):
+            continue
+        out.append({
+            "name": name,
+            "host": s.get("host", "imap.gmail.com"),
+            "user": s.get("user"),
+            "pass": s.get("pass"),
+            "folder": s.get("folder", "INBOX"),
+        })
+    return out
+
+
+def unread_for(acct):
+    with imaplib.IMAP4_SSL(acct["host"], timeout=20) as m:
+        m.login(acct["user"], acct["pass"])
+        # STATUS rather than SELECT + SEARCH: one round trip, and it cannot
+        # mark anything read even by accident.
+        typ, data = m.status(acct["folder"], "(UNSEEN)")
+        if typ != "OK":
+            raise RuntimeError(f"STATUS returned {typ}")
+        return int(data[0].decode().rsplit("UNSEEN", 1)[1].strip(" ()"))
+
+
+def previous():
+    if os.path.exists(OUT):
+        try:
+            return json.load(open(OUT))
+        except Exception:
+            pass
+    return {}
 
 
 def write(doc):
@@ -52,40 +95,40 @@ def write(doc):
 
 def main():
     now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
-    conf = read_conf()
-    if not conf or not conf.get("user") or not conf.get("pass"):
-        write({"unread": 0, "ok": False, "error": "no credentials", "checked_at": now})
+    accts = accounts()
+    if not accts:
+        write({"unread": 0, "ok": False, "error": "no credentials",
+               "accounts": [], "checked_at": now})
         sys.exit(f"mail-count: no usable credentials in {CONF}")
 
-    host = conf.get("host", "imap.gmail.com")
-    folder = conf.get("folder", "INBOX")
-    try:
-        with imaplib.IMAP4_SSL(host, timeout=20) as m:
-            m.login(conf["user"], conf["pass"])
-            # STATUS rather than SELECT + SEARCH: one round trip, and it cannot
-            # mark anything read even by accident.
-            typ, data = m.status(folder, "(UNSEEN)")
-            if typ != "OK":
-                raise RuntimeError(f"STATUS returned {typ}")
-            # b'INBOX (UNSEEN 3)'
-            text = data[0].decode()
-            unread = int(text.rsplit("UNSEEN", 1)[1].strip(" ()"))
-    except Exception as e:
-        # Keep the last good count rather than flashing zero when the wifi
-        # drops; the bar shows staleness instead.
-        previous = 0
-        if os.path.exists(OUT):
-            try:
-                previous = json.load(open(OUT)).get("unread", 0)
-            except Exception:
-                pass
-        write({"unread": previous, "ok": False,
-               "error": type(e).__name__, "checked_at": now})
-        sys.exit(f"mail-count: {type(e).__name__}: {e}")
+    was = {a["name"]: a for a in previous().get("accounts", [])}
+    rows, failures = [], []
+    for acct in accts:
+        try:
+            rows.append({"name": acct["name"], "user": acct["user"],
+                         "unread": unread_for(acct), "ok": True, "error": ""})
+        except Exception as e:
+            # Keep this account's last good count rather than dropping to zero
+            # when one mailbox is unreachable; the others still report.
+            kept = was.get(acct["name"], {}).get("unread", 0)
+            rows.append({"name": acct["name"], "user": acct["user"],
+                         "unread": kept, "ok": False, "error": type(e).__name__})
+            failures.append(f'{acct["name"]}: {type(e).__name__}')
 
-    write({"unread": unread, "ok": True, "error": "", "checked_at": now})
+    write({
+        "unread": sum(r["unread"] for r in rows),
+        "ok": not failures,
+        "error": "; ".join(failures),
+        "accounts": rows,
+        "checked_at": now,
+    })
+
     if sys.stdout.isatty():
-        print(f"{unread} unread in {folder}")
+        for r in rows:
+            mark = "" if r["ok"] else f'   ({r["error"]})'
+            print(f'  {r["unread"]:>3}  {r["name"]:<8} {r["user"]}{mark}')
+    if failures:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

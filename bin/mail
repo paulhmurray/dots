@@ -97,10 +97,21 @@ PYEOF
             exit 0
         fi
         cat > "$CONF" <<'EOF'
+# One section per account. The bar shows the total; hovering breaks it down.
+# Mode 0600 — this file holds app passwords and is never committed.
+
+[main]
 host=imap.gmail.com
 user=CHANGEME@gmail.com
 pass=CHANGEME
 folder=INBOX
+
+# A second account: uncomment and fill in. Each needs its own app password.
+#[old]
+#host=imap.gmail.com
+#user=CHANGEME@gmail.com
+#pass=CHANGEME
+#folder=INBOX
 EOF
         chmod 600 "$CONF"
         cat <<EOF
