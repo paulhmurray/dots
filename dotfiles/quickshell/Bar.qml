@@ -241,7 +241,7 @@ PanelWindow {
             id: syncItem
             visible: !Sync.clean
             label: Sync.summary + "\n\nclick: dots sync"
-            onClicked: Quickshell.execDetached(["foot", "-e", "dots", "sync"])
+            onClicked: Sync.runInTerminal("dots sync")
             // Colour by what is wrong, not by how fresh the check is. A stale
             // check still reports real local drift, so dimming it would hide
             // something true; the tooltip says the check could not reach
@@ -269,7 +269,7 @@ PanelWindow {
 
         Hover {
             label: "System upgrade  (repo + AUR)\n\nclick: dots upgrade"
-            onClicked: Quickshell.execDetached(["foot", "-e", "dots", "upgrade"])
+            onClicked: Sync.runInTerminal("dots upgrade")
             Icon { text: "󰚰"; color: Colours.dim }
         }
 

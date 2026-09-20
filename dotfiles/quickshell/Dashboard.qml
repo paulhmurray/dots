@@ -300,14 +300,14 @@ PanelWindow {
                                 icon: "󰓦"
                                 action: () => {
                                     win.visible = false;
-                                    Quickshell.execDetached(["foot", "-e", "dots", "sync"]);
+                                    Sync.runInTerminal("dots sync");
                                 }
                             }
                             IconButton {
                                 icon: "󰚰"
                                 action: () => {
                                     win.visible = false;
-                                    Quickshell.execDetached(["foot", "-e", "dots", "upgrade"]);
+                                    Sync.runInTerminal("dots upgrade");
                                 }
                             }
                         }

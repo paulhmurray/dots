@@ -84,6 +84,21 @@ Singleton {
         return bits.length > 0 ? bits.join("\n") : "up to date";
     }
 
+    // Run a command in a terminal that stays open if it fails.
+    //
+    // `foot -e dots sync` closes the moment the command exits, so a failure —
+    // "uncommitted changes would be overwritten" — flashed up and vanished,
+    // and clicking the icon looked like it did nothing at all. On success it
+    // still closes straight away; only failure waits for a keypress.
+    //
+    // bash -lc, not plain -c: a login shell picks up ~/.local/bin from
+    // .bashrc, so this cannot fail merely because the bar was started with a
+    // thinner PATH.
+    function runInTerminal(cmd) {
+        Quickshell.execDetached(["foot", "-e", "bash", "-lc",
+            cmd + ' || { printf "\n\n[%s exited %s]\npress any key to close" "' + cmd + '" "$?"; read -rsn1; }']);
+    }
+
     function ingest(text) {
         try {
             const d = JSON.parse(text);
