@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""Fetch current headlines into ~/.cache/dots/news.json for the Dashboard.
+
+Reads the same feed list newsboat uses (dotfiles/newsboat/urls), so there is
+one place to add or remove a source rather than two that drift apart.
+
+Independent of newsboat itself: the Dashboard should show headlines whether or
+not the reader has ever been opened, and newsboat's cache is a sqlite database
+whose schema is its own business.
+"""
+import concurrent.futures
+import html
+import json
+import os
+import re
+import sys
+import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+
+URLS = os.path.expanduser("~/.config/newsboat/urls")
+CACHE_DIR = os.path.join(
+    os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "dots"
+)
+OUT = os.path.join(CACHE_DIR, "news.json")
+UA = "dots-news/1 (personal feed reader)"
+ATOM = "{http://www.w3.org/2005/Atom}"
+
+
+def feeds():
+    """(url, source, region) for every feed, from newsboat's own url list."""
+    if not os.path.exists(URLS):
+        return []
+    out = []
+    for line in open(URLS):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        url = line.split()[0]
+        tags = re.findall(r'"([^"]*)"', line)
+        region = tags[0] if tags else ""
+        source = tags[1] if len(tags) > 1 else url.split("/")[2]
+        out.append((url, source, region))
+    return out
+
+
+def clean(text):
+    text = html.unescape(text or "").strip()
+    return re.sub(r"\s+", " ", text)
+
+
+def fetch(entry):
+    url, source, region = entry
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        raw = urllib.request.urlopen(req, timeout=15).read()
+        root = ET.fromstring(raw)
+        items = root.findall(".//item") or root.findall(f".//{ATOM}entry")
+        out = []
+        for it in items[:6]:
+            title = it.findtext("title") or it.findtext(f"{ATOM}title") or ""
+            link = it.findtext("link") or ""
+            if not link:  # atom puts it in an attribute
+                a = it.find(f"{ATOM}link")
+                link = a.get("href", "") if a is not None else ""
+            if not title:
+                continue
+            out.append({"title": clean(title), "link": link.strip(),
+                        "source": source, "region": region})
+        return out
+    except Exception:
+        # One dead feed must not empty the card.
+        return []
+
+
+def main():
+    entries = feeds()
+    if not entries:
+        sys.exit(f"news-headlines: no feeds in {URLS}")
+
+    stories = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        for got in pool.map(fetch, entries):
+            stories.extend(got)
+
+    # Interleave by source rather than dumping six from each in turn, so the
+    # card shows a spread instead of whichever feed happened to be first.
+    by_source = {}
+    for s in stories:
+        by_source.setdefault(s["source"], []).append(s)
+    mixed, i = [], 0
+    while any(len(v) > i for v in by_source.values()):
+        for src in by_source:
+            if len(by_source[src]) > i:
+                mixed.append(by_source[src][i])
+        i += 1
+
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    doc = {
+        "stories": mixed[:60],
+        "sources": len(by_source),
+        "failed": len(entries) - len(by_source),
+        "checked_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+    }
+    tmp = OUT + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(doc, f)
+    os.replace(tmp, OUT)
+
+    if sys.stdout.isatty():
+        print(f'{len(mixed)} headlines from {doc["sources"]} sources'
+              + (f', {doc["failed"]} feed(s) failed' if doc["failed"] else ""))
+
+
+if __name__ == "__main__":
+    main()

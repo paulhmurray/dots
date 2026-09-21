@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh headlines every half hour
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

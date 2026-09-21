@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh headlines for the Dashboard
+Documentation=https://github.com/paulhmurray/dots
+
+[Service]
+Type=oneshot
+# Reads public RSS feeds and writes ~/.cache/dots/news.json. No credentials,
+# nothing to apply, nothing that can interrupt you.
+ExecStart=%h/.local/bin/news-headlines
+TimeoutStartSec=120

@@ -25,7 +25,7 @@ source "$DOTS/theme/$THEME.sh"
 # Every directory, because four of these files are the only tracked thing in
 # theirs — foot, mako, nvim/lua and zathura simply do not exist in a fresh
 # clone now that the generated files are untracked.
-mkdir -p "$DOTS"/dotfiles/{hypr,foot,quickshell,mako,tmux,zathura} \
+mkdir -p "$DOTS"/dotfiles/{hypr,foot,quickshell,mako,tmux,zathura,newsboat} \
          "$DOTS/dotfiles/nvim/lua"
 
 cat > "$DOTS/dotfiles/hypr/colours.conf" << CONF
@@ -135,6 +135,25 @@ set -g message-style "bg=#$SURFACE,fg=#$FG"
 TMUX
 
 echo "return \"$NVIM\"" > "$DOTS/dotfiles/nvim/lua/theme.lua"
+
+# newsboat takes colour names, not hex, so this maps the palette onto the
+# sixteen it understands. Included by dotfiles/newsboat/config.
+cat > "$DOTS/dotfiles/newsboat/colors" << NEWS
+color background          default  default
+color listnormal          default  default
+color listnormal_unread   yellow   default  bold
+color listfocus           black    yellow
+color listfocus_unread    black    yellow   bold
+color info                black    blue
+color article             default  default
+color hint-key            yellow   default  bold
+color hint-keys-delimiter default  default
+color hint-description    default  default
+
+highlight article "^(Feed|Title|Author|Link|Date):.*" blue default bold
+highlight article "https?://[^ ]+" magenta default underline
+highlight article "\\[[0-9]+\\]" yellow default bold
+NEWS
 
 cat > "$DOTS/dotfiles/zathura/zathurarc" << ZATH
 set font "JetBrainsMono Nerd Font 11"

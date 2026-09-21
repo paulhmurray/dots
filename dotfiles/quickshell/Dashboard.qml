@@ -96,7 +96,7 @@ PanelWindow {
 
     Rectangle {
         width: 980
-        height: 540
+        height: 700
         anchors.centerIn: parent
         color: Colours.bg
         radius: 12
@@ -145,7 +145,7 @@ PanelWindow {
 
             Row {
                 width: parent.width
-                height: parent.height - 40 - 72 - 24
+                height: parent.height - 40 - 140 - 72 - 36
                 spacing: 12
 
                 Card {
@@ -309,6 +309,70 @@ PanelWindow {
                                     win.visible = false;
                                     Sync.runInTerminal("dots upgrade");
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Headlines get the full width: they are sentences, and a fifth
+            // narrow column would truncate every one of them. Click opens the
+            // story in Firefox; Super+N opens the reader proper.
+            Rectangle {
+                width: parent.width
+                height: 140
+                radius: 10
+                color: Colours.surface
+
+                Txt {
+                    x: 14; y: 10
+                    text: "NEWS"
+                    color: Colours.dim
+                    font.pixelSize: 11
+                    font.bold: true
+                }
+                Txt {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    y: 10
+                    text: News.ready
+                          ? News.sources + " sources" + (News.failed > 0 ? "  ·  " + News.failed + " unreachable" : "")
+                          : "no headlines yet"
+                    color: Colours.dim
+                    font.pixelSize: 11
+                }
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 14
+                    anchors.topMargin: 32
+                    spacing: 3
+                    Repeater {
+                        model: News.stories.slice(0, 5)
+                        Item {
+                            required property var modelData
+                            width: parent.width
+                            height: 19
+                            Txt {
+                                id: src
+                                text: modelData.source
+                                color: Colours.accent
+                                font.pixelSize: 11
+                                width: 96
+                                elide: Text.ElideRight
+                            }
+                            Txt {
+                                x: 104
+                                width: parent.width - 104
+                                anchors.verticalCenter: src.verticalCenter
+                                text: modelData.title
+                                elide: Text.ElideRight
+                                font.pixelSize: 12
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: { win.visible = false; News.open(modelData.link); }
                             }
                         }
                     }

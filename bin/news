@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Show and hide the news reader, and keep the Dashboard's headlines fresh.
+#
+# newsboat is a terminal program, so the scratchpad window is a foot instance
+# with its own app-id — that is what the Hyprland rule matches on, rather than
+# catching every terminal you have open.
+set -euo pipefail
+
+APPID=dots-news
+DOTS="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+
+running() { pgrep -x newsboat >/dev/null 2>&1; }
+
+ensure() {
+    running && return 0
+    setsid foot --app-id="$APPID" -e newsboat >/dev/null 2>&1 &
+    for _ in $(seq 1 30); do
+        sleep 0.4
+        running && return 0
+    done
+    echo "news: newsboat did not start" >&2
+    return 1
+}
+
+case "${1:-}" in
+    ensure) ensure ;;
+
+    # Toggle it over your work, like mail and music.
+    window)
+        ensure
+        command -v hyprctl >/dev/null && \
+            hyprctl dispatch togglespecialworkspace news >/dev/null 2>&1 || true
+        ;;
+
+    # Always bring it into view — for the launcher, which must never hide.
+    show)
+        ensure
+        if command -v hyprctl >/dev/null; then
+            shown=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].specialWorkspace.name // ""')
+            [ "$shown" = "special:news" ] || hyprctl dispatch togglespecialworkspace news >/dev/null 2>&1 || true
+        fi
+        ;;
+
+    headlines) "$DOTS/bin/news-headlines" ;;
+
+    *)
+        cat <<'USAGE'
+usage: news <command>
+
+  window     show/hide the reader over your work
+  show       bring it into view (never hides)
+  ensure     start newsboat if it is not running
+  headlines  refresh the Dashboard's headlines now
+USAGE
+        exit 2 ;;
+esac

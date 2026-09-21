@@ -156,8 +156,8 @@ for u in "$DOTS"/systemd/*; do
     ln -sfn "$u" "$HOME/.config/systemd/user/$(basename "$u")"
 done
 systemctl --user daemon-reload
-systemctl --user enable --now dots-status.timer dots-pacman.path dots-mail.timer
-echo "    dots-status.timer, dots-pacman.path, dots-mail.timer"
+systemctl --user enable --now dots-status.timer dots-pacman.path dots-mail.timer dots-news.timer
+echo "    dots-status.timer, dots-pacman.path, dots-mail.timer, dots-news.timer"
 
 echo "==> System scripts"
 for s in "$DOTS"/scripts/*.sh; do "$s"; done
