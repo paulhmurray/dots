@@ -5,8 +5,12 @@
 # small on purpose, and ~/Pictures is already carried between machines by
 # Syncthing, so wallpapers follow you without bloating git.
 #
-#   ~/Pictures/wallpapers/<theme>/   used only when that theme is active
-#   ~/Pictures/wallpapers/           used whatever the theme
+#   ~/Pictures/wallpapers/<theme>/   offered only while that theme is active
+#   ~/Pictures/wallpapers/           offered whatever the theme
+#
+# Both are pooled together rather than the theme folder winning outright, so a
+# wallpaper you like everywhere stays in the rotation after you add
+# theme-specific ones.
 #
 # With neither, it falls back to the Hyprland default, which is why pressing
 # the key used to appear to do nothing.
@@ -18,13 +22,15 @@ FALLBACK=/usr/share/hypr/wall0.png
 
 shopt -s nocaseglob nullglob
 candidates=()
+# Note these are the directories themselves, not a recursive search: images in
+# ~/Pictures/wallpapers/<theme>/ are found by the first entry, and the shared
+# folder's own files by the second, without the theme folders being swept up
+# into it twice.
 for dir in "$WALLDIR/$THEME" "$WALLDIR" "$DOTS/wallpapers/$THEME"; do
     [ -d "$dir" ] || continue
     for f in "$dir"/*.jpg "$dir"/*.jpeg "$dir"/*.png "$dir"/*.webp; do
         [ -f "$f" ] && candidates+=("$f")
     done
-    # A theme folder wins outright; only fall through when it is empty.
-    [ ${#candidates[@]} -gt 0 ] && break
 done
 shopt -u nocaseglob nullglob
 

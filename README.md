@@ -63,9 +63,13 @@ carried between machines by Syncthing, so wallpapers follow you for free.
     ~/Pictures/wallpapers/<theme>/   used only while that theme is active
     ~/Pictures/wallpapers/           used whatever the theme
 
-A theme folder wins outright; the shared folder is the fallback, then the
-Hyprland default. Consecutive presses never repeat the current image, and an
+Both are pooled, so an image you like everywhere stays in rotation after you add
+theme-specific ones. Consecutive presses never repeat the current image, and an
 empty folder says so once rather than silently doing nothing.
+
+Hyprland ships three wallpapers in `/usr/share/hypr/`. They are copied into the
+shared folder rather than read from there, so a Hyprland upgrade cannot replace
+or remove them, and Syncthing carries them to the other machine.
 
 ## Machine-local, never committed
 
