@@ -12,3 +12,7 @@ dotfiles/mako/config
 dotfiles/tmux/colours.conf
 dotfiles/nvim/lua/theme.lua
 dotfiles/zathura/zathurarc
+
+# Wallpapers live in ~/Pictures/wallpapers, not here: this repo is public
+# and should stay small. wall.sh still reads this path if it exists.
+wallpapers/

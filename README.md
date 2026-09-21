@@ -54,6 +54,19 @@ own app password rather than asking Thunderbird — so it is right whether
 Thunderbird is running or not, and a Thunderbird upgrade cannot break it. Run
 `mail setup` once to create the credential file.
 
+## Wallpapers
+
+`Super+Shift+T` picks a new one. Images live in `~/Pictures/wallpapers`, not in
+this repo — it is public and meant to stay small, and `~/Pictures` is already
+carried between machines by Syncthing, so wallpapers follow you for free.
+
+    ~/Pictures/wallpapers/<theme>/   used only while that theme is active
+    ~/Pictures/wallpapers/           used whatever the theme
+
+A theme folder wins outright; the shared folder is the fallback, then the
+Hyprland default. Consecutive presses never repeat the current image, and an
+empty folder says so once rather than silently doing nothing.
+
 ## Machine-local, never committed
 
 - `~/.bashrc.local` — anything naming hosts, IPs or secrets; sourced by `home/.bashrc`
@@ -92,7 +105,7 @@ ends. Re-run `music-index` after adding music.
 - `home/`      symlinked into `~`
 - `hosts/<hostname>/`  packages, monitor config, setup script per machine
 - `theme/`     palettes; `apply.sh <name>` regenerates every colour file; `wall.sh` wallpaper
-- `wallpapers/<theme>/`  images; empty means solid colour
+- `theme/wall.sh`  picks a wallpaper; images live outside the repo (see below)
 - `scripts/`   system setup, run by install.sh, must be idempotent
 
 ## Snapshots
