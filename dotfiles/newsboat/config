@@ -40,7 +40,10 @@ browser "news open %u"
 # selection is the publication's front page rather than an article.
 #
 # Needs: rdrview (AUR) and w3m.
-bind v articlelist,article set browser "rdrview -B w3m %u" ; open-in-browser ; set browser "news open %u" -- "Read here"
+# news-render is a one-word wrapper around w3m, so rdrview's -B never has to
+# take a quoted multi-word command. It also turns off w3m's exit confirmation,
+# so q leaves the article in one keypress.
+bind v articlelist,article set browser "rdrview -B news-render %u" ; open-in-browser ; set browser "news open %u" -- "Read here"
 
 # Readable article view rather than raw HTML.
 text-width 100

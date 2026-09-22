@@ -85,9 +85,9 @@ eleven here only The Conversation ships full text. So:
 - `v` renders the article as text in the terminal, via Firefox's Reader View as
   a command line tool. Needs `rdrview` (AUR) and `w3m`.
 
-Both act on whatever is selected, so use them on an article, not on a feed —
-from the feed list they open the publication's front page and you get a list of
-headlines. `l` or `Enter` goes into a feed first.
+`v` is bound only in the article list and article view, so it cannot fire on the
+feed list — there the selection is the publication's front page, not a story.
+Press `q` to leave the article and return to newsboat.
 
 ## Machine-local, never committed
 

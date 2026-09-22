@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Renders an extracted article for `v` in newsboat.
+#
+# A separate script so rdrview's -B gets a single word. Whether rdrview splits
+# a multi-word browser argument or execs it whole is not something this setup
+# should depend on, and it cannot be tested without a terminal.
+#
+# confirm_qq=false: otherwise q asks "Do you want to exit w3m?" and wants a y
+# as well, which is a poor way to leave something you have finished reading.
+exec w3m -o confirm_qq=false "$@"
