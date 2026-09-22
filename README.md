@@ -89,6 +89,13 @@ eleven here only The Conversation ships full text. So:
 feed list — there the selection is the publication's front page, not a story.
 Press `q` to leave the article and return to newsboat.
 
+`bin/news-read` passes w3m `confirm_qq=false`, and that is not cosmetic. Without
+it w3m answers `q` with "Do you want to exit w3m? (y/n)" on the bottom line
+only. `q` is not `y`, so holding down `q` never exits and the reader looks
+frozen — newsboat is fine underneath, waiting on a prompt that is easy to miss.
+It also runs rdrview under `timeout 25`, because rdrview has none of its own and
+newsboat has already blanked its UI by the time the fetch starts.
+
 ## Machine-local, never committed
 
 - `~/.bashrc.local` — anything naming hosts, IPs or secrets; sourced by `home/.bashrc`
