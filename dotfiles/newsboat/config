@@ -40,10 +40,11 @@ browser "news open %u"
 # selection is the publication's front page rather than an article.
 #
 # Needs: rdrview (AUR) and w3m.
-# news-render is a one-word wrapper around w3m, so rdrview's -B never has to
-# take a quoted multi-word command. It also turns off w3m's exit confirmation,
-# so q leaves the article in one keypress.
-bind v articlelist,article set browser "rdrview -B news-render %u" ; open-in-browser ; set browser "news open %u" -- "Read here"
+# news-read does the extraction and the rendering itself rather than chaining
+# rdrview -B into w3m. Two reasons, both of which showed up as newsboat simply
+# sitting there: rdrview's -B path opens /dev/tty, and rdrview has no timeout,
+# so a slow or blocked page hangs with nothing on screen to say why.
+bind v articlelist,article set browser "news-read %u" ; open-in-browser ; set browser "news open %u" -- "Read here"
 
 # Readable article view rather than raw HTML.
 text-width 100

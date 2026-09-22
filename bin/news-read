@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Extract and show an article for newsboat's `v` binding.
+#
+# Does the extraction and the rendering itself rather than leaving it to
+# rdrview -B, for two reasons. rdrview's -B path opens /dev/tty, which is
+# fragile about how it is invoked; and rdrview has no timeout of its own, so a
+# slow or paywalled page leaves newsboat sitting there looking hung with no way
+# to tell what it is waiting for.
+set -uo pipefail
+url="${1:-}"
+[ -n "$url" ] || { echo "news-read: no url"; read -rsn1; exit 2; }
+
+tmp=$(mktemp --suffix=.html)
+trap 'rm -f "$tmp"' EXIT
+
+if timeout 25 rdrview -H "$url" > "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+    # -T so w3m treats a file with no server to ask as HTML.
+    w3m -o confirm_qq=false -T text/html "$tmp"
+else
+    cat <<MSG
+
+  Could not read this one here.
+
+  Some sites block the extractor, and paywalled articles have nothing to
+  extract. Press o instead to open it in Firefox.
+
+  (any key to go back)
+MSG
+    read -rsn1
+fi
