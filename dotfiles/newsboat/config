@@ -33,12 +33,14 @@ browser "news open %u"
 # the publisher driving traffic to their site, not a setting — so without this
 # almost everything needs the browser.
 #
-# USE IT ON AN ARTICLE, NOT A FEED. Both o and v open whatever is selected, so
-# on the feed list that is the publication's front page and you get a page of
-# headlines. Press l or Enter into a feed first, then v on a story.
+# bind rather than macro: a macro can only be reached through the macro-prefix
+# (",v"), and plain v is newsboat's own view-dialogs — which is what you get
+# instead, a list of open dialogs. bind also scopes the key to the two dialogs
+# where it means anything, so it cannot fire on the feed list, where the
+# selection is the publication's front page rather than an article.
 #
 # Needs: rdrview (AUR) and w3m.
-macro v set browser "rdrview -B w3m %u"; open-in-browser; set browser "news open %u"
+bind v articlelist,article set browser "rdrview -B w3m %u" ; open-in-browser ; set browser "news open %u" -- "Read here"
 
 # Readable article view rather than raw HTML.
 text-width 100
