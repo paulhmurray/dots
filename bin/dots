@@ -4,6 +4,7 @@ set -euo pipefail
 
 # Resolve through the symlink in ~/.local/bin back to the repo it lives in.
 DOTS="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+APPLIED="${XDG_CACHE_HOME:-$HOME/.cache}/dots/applied"
 export DOTS
 # shellcheck source=../lib/dots-status.sh
 source "$DOTS/lib/dots-status.sh"
@@ -43,7 +44,17 @@ cmd_upgrade() {
     local before after
     before=$(dots_reboot_watch)
     echo "==> Full system upgrade (repo + AUR)"
-    yay -Syu
+    # Guarded: bin/dots runs under set -e, and yay exits non-zero both when a
+    # package fails to build and when you simply answer n at its [Y/n]. Left
+    # bare, either one killed the whole command at this line — which mattered
+    # most inside sync, where the pull had already happened and install.sh had
+    # not yet run.
+    if ! yay -Syu; then
+        echo >&2
+        echo "    Upgrade did not complete — declined at the prompt, or a" >&2
+        echo "    package failed. Nothing else was changed." >&2
+        return 1
+    fi
     after=$(dots_reboot_watch)
     if [ "$before" != "$after" ]; then
         echo
@@ -106,6 +117,10 @@ cmd_auth() {
 }
 
 # --- sync ------------------------------------------------------------------
+mark_applied() {
+    mkdir -p "$(dirname "$APPLIED")" && echo "$1" > "$APPLIED"
+}
+
 relink() {
     local f name target
     mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications"
@@ -178,21 +193,31 @@ cmd_sync() {
         return 1
     fi
 
-    local before after changed
+    local before after changed baseline
     before=$(git rev-parse HEAD)
     echo "==> Pulling"
     git pull --ff-only
     after=$(git rev-parse HEAD)
 
-    if [ "$before" = "$after" ]; then
+    # The commit this machine last finished applying, which is not the same as
+    # the commit it has checked out. A sync that pulled and then failed part
+    # way through leaves those two apart, and measuring from HEAD-before-pull
+    # would call the leftover work "already up to date" forever. Missing or
+    # unrecognised marker falls back to the old behaviour.
+    baseline=$(cat "$APPLIED" 2>/dev/null || true)
+    git cat-file -e "${baseline}^{commit}" 2>/dev/null || baseline="$before"
+
+    if [ "$baseline" = "$after" ]; then
         echo "==> Already up to date"
         # The theme files were just discarded; put them back before leaving.
         "$DOTS/theme/apply.sh" >/dev/null 2>&1 || true
+        mark_applied "$after"
         refresh_status
         return 0
     fi
 
-    changed=$(git diff --name-only "$before" "$after")
+    changed=$(git diff --name-only "$baseline" "$after")
+    [ "$baseline" = "$before" ] || echo "==> Finishing work left over from an earlier sync"
     echo "==> $(wc -l <<<"$changed") file(s) changed"
 
     local needs_install=0 needs_theme=0 needs_reload=0 needs_link=0
@@ -209,7 +234,18 @@ cmd_sync() {
     # On a stale database that is either a 404 or, worse, a partial upgrade, so
     # the upgrade is a prerequisite of this branch and only this branch.
     if [ "$needs_install" = 1 ]; then
-        cmd_upgrade
+        if ! cmd_upgrade; then
+            # Without this the retry is blind: the pull has already advanced
+            # HEAD, so a sync measuring from HEAD-before-pull sees no change
+            # and reports "already up to date" over a machine that never
+            # installed anything.
+            mark_applied "$baseline"
+            echo >&2
+            echo "    The pull succeeded but nothing was installed, so this machine" >&2
+            echo "    now has the new configuration without the packages it needs." >&2
+            echo "    Run 'dots sync' again to pick up exactly where this stopped." >&2
+            return 1
+        fi
         echo "==> Running install.sh"
         "$DOTS/install.sh"
     fi
@@ -240,6 +276,7 @@ cmd_sync() {
         "$DOTS/theme/apply.sh" >/dev/null 2>&1 || true
     fi
 
+    mark_applied "$after"
     refresh_status
     echo "==> Done"
 }
