@@ -20,6 +20,7 @@ usage: dots <command>
   add <pkg>        upgrade, install, record in a list, commit and push
   upgrade          yay -Syu, then say whether a reboot is needed
   auth             set this machine up to push (one time, needs a token)
+  relink           remake the ~/.local/bin and ~ symlinks, drop dead ones
 
 status only reads: no sudo, no fetch, no pacman transaction.
 sync, add and upgrade are interactive by design — an upgrade always stops at
@@ -105,6 +106,41 @@ cmd_auth() {
 }
 
 # --- sync ------------------------------------------------------------------
+relink() {
+    local f name target
+    mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications"
+
+    for f in "$DOTS"/bin/*; do
+        ln -sfn "$f" "$HOME/.local/bin/$(basename "$f")"
+    done
+    for f in "$DOTS"/desktop/*.desktop; do
+        [ -e "$f" ] || continue
+        ln -sfn "$f" "$HOME/.local/share/applications/$(basename "$f")"
+    done
+    # Home files are linked only where nothing real is in the way: clobbering
+    # someone's actual ~/.bashrc is install.sh's decision to make, with its
+    # keep-a-copy behaviour, not a background sync's.
+    for f in "$DOTS"/home/.[!.]*; do
+        [ -e "$f" ] || continue
+        name=$(basename "$f")
+        if [ -e "$HOME/$name" ] && [ ! -L "$HOME/$name" ]; then
+            echo "    left your own $name alone (run install.sh to replace it)"
+        else
+            ln -sfn "$f" "$HOME/$name"
+        fi
+    done
+
+    # Links this repo made whose target has since gone. Scoped to links that
+    # point into $DOTS so nothing else on the machine is touched.
+    for f in "$HOME"/.local/bin/* "$HOME"/.local/share/applications/*; do
+        [ -L "$f" ] || continue
+        target=$(readlink "$f")
+        case "$target" in
+            "$DOTS"/*) [ -e "$f" ] || { rm -f "$f"; echo "    removed stale $(basename "$f")"; } ;;
+        esac
+    done
+}
+
 cmd_sync() {
     cd "$DOTS"
 
@@ -159,12 +195,13 @@ cmd_sync() {
     changed=$(git diff --name-only "$before" "$after")
     echo "==> $(wc -l <<<"$changed") file(s) changed"
 
-    local needs_install=0 needs_theme=0 needs_reload=0
+    local needs_install=0 needs_theme=0 needs_reload=0 needs_link=0
     while read -r f; do
         case "$f" in
             packages/*|hosts/*|scripts/*|systemd/*|install.sh) needs_install=1 ;;
             theme/*)    needs_theme=1 ;;
             dotfiles/*) needs_reload=1 ;;
+            bin/*|home/*|desktop/*) needs_link=1 ;;
         esac
     done <<<"$changed"
 
@@ -175,6 +212,17 @@ cmd_sync() {
         cmd_upgrade
         echo "==> Running install.sh"
         "$DOTS/install.sh"
+    fi
+
+    # bin/, home/ and desktop/ reach the machine as symlinks that install.sh
+    # makes, so until they are remade a pull changes nothing. That failure is
+    # nastier than it sounds: a new command is simply absent from PATH, which
+    # looks like the command being broken rather than like a sync that did not
+    # finish, and a removed one leaves a link pointing at nothing. install.sh
+    # already relinks, so this only runs when it did not.
+    if [ "$needs_link" = 1 ] && [ "$needs_install" = 0 ]; then
+        echo "==> Relinking commands"
+        relink
     fi
 
     # Bare, so the machine keeps its own theme. A palette edit upstream reaches
@@ -402,6 +450,7 @@ case "${1:-}" in
     add)     shift; cmd_add "$@" ;;
     upgrade) shift; cmd_upgrade "$@" ;;
     auth)    shift; cmd_auth "$@" ;;
+    relink)  shift; echo "==> Relinking commands"; relink ;;
     -h|--help|help|"") usage ;;
     *) echo "dots: unknown command '$1'" >&2; usage >&2; exit 2 ;;
 esac
