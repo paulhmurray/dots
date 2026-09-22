@@ -41,6 +41,19 @@ case "${1:-}" in
         fi
         ;;
 
+    # newsboat's browser setting points here. Getting out of the way first is
+    # the point: the reader sits on a scratchpad over your work, so opening an
+    # article behind it leaves you reading nothing.
+    open)
+        shift
+        if command -v hyprctl >/dev/null; then
+            shown=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].specialWorkspace.name // ""')
+            [ "$shown" = "special:news" ] && \
+                hyprctl dispatch togglespecialworkspace news >/dev/null 2>&1 || true
+        fi
+        setsid firefox "$@" >/dev/null 2>&1 &
+        ;;
+
     headlines) "$DOTS/bin/news-headlines" ;;
 
     *)
@@ -50,6 +63,7 @@ usage: news <command>
   window     show/hide the reader over your work
   show       bring it into view (never hides)
   ensure     start newsboat if it is not running
+  open <url> hide the reader, then open the url in Firefox
   headlines  refresh the Dashboard's headlines now
 USAGE
         exit 2 ;;

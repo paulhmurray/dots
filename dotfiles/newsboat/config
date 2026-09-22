@@ -24,9 +24,16 @@ bind-key g home
 bind-key l open
 bind-key h quit
 
-# Open in the browser with o; firefox is already the default handler.
-browser "firefox %u"
-macro o set browser "firefox %u"; open-in-browser; set browser "firefox %u"
+# o opens in Firefox, and gets the reader out of the way first: it floats over
+# your work, so opening an article behind it would leave you reading nothing.
+browser "news open %u"
+
+# v reads the article in the terminal instead, via Firefox's Reader View as a
+# command line tool. Most feeds here carry only a 100-500 character teaser —
+# that is the publisher driving traffic to their site, not a setting — so
+# without this almost everything needs the browser.
+# Needs: dots add rdrview --aur  and  dots add w3m --system
+macro v set browser "rdrview -B w3m %u"; open-in-browser; set browser "news open %u"
 
 # Readable article view rather than raw HTML.
 text-width 100

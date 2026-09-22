@@ -71,6 +71,20 @@ Hyprland ships three wallpapers in `/usr/share/hypr/`. They are copied into the
 shared folder rather than read from there, so a Hyprland upgrade cannot replace
 or remove them, and Syncthing carries them to the other machine.
 
+## News
+
+`Super+N` opens newsboat on its own scratchpad; the Dashboard carries the
+latest headlines. Feeds are in `dotfiles/newsboat/urls`, grouped by region.
+
+Most feeds carry only a 100-500 character teaser rather than the article —
+that is the publisher driving traffic to their own site, not a setting. Of the
+eleven here only The Conversation ships full text. So:
+
+- `o` opens the story in Firefox, hiding the reader first so it is not sitting
+  over what you wanted to read
+- `v` renders the article as text in the terminal, via Firefox's Reader View as
+  a command line tool. Needs `rdrview` (AUR) and `w3m`.
+
 ## Machine-local, never committed
 
 - `~/.bashrc.local` — anything naming hosts, IPs or secrets; sourced by `home/.bashrc`
