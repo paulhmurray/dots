@@ -137,7 +137,11 @@ fi
 # ---- install -------------------------------------------------------------
 if [ ${#PKGS[@]} -gt 0 ]; then
     echo "==> Hardware packages: ${PKGS[*]}"
-    sudo pacman -S --needed --noconfirm "${PKGS[@]}"
+    # Reported rather than fatal. The initramfs rebuild below is triggered by a
+    # drop-in changing, not by these packages, so a microcode package that
+    # failed to install should not also leave the initramfs stale.
+    sudo pacman -S --needed --noconfirm "${PKGS[@]}" \
+        || echo "    could not install: ${PKGS[*]} — continuing"
 fi
 
 # Rebuild the initramfs only when a drop-in changed the modules it contains.
