@@ -17,6 +17,7 @@ echo "==> Packages (pacman)"
 # made — so a machine could end up with packages and no configuration at all.
 # Now the good ones land, the bad ones are named, and the run continues.
 PKG_FAILED=()
+SCRIPT_FAILED=()
 install_list() {
     local file="$1" name pkg
     name=$(basename "$file" .txt)
@@ -42,15 +43,37 @@ if ! command -v yay >/dev/null; then
 fi
 
 echo "==> Packages (AUR)"
-yay -S --needed --noconfirm $(cat "$DOTS"/packages/aur.txt)
+# Same treatment the pacman lists get, and for the same reason. This was bare,
+# and it sits before every symlink in this file: one AUR package failing to
+# build took the whole run down, so the machine ended up with packages and no
+# configuration — no theme, no dotfiles, no commands on PATH, no services.
+# An AUR build failing is ordinary; losing the install over it is not.
+# shellcheck disable=SC2046  # word splitting is the point: see the list format
+if ! yay -S --needed --noconfirm $(cat "$DOTS"/packages/aur.txt); then
+    echo "    the AUR batch failed — retrying one at a time to find the culprit"
+    for pkg in $(cat "$DOTS"/packages/aur.txt); do
+        yay -S --needed --noconfirm "$pkg" >/dev/null 2>&1 \
+            || { echo "      could not install: $pkg"; PKG_FAILED+=("$pkg"); }
+    done
+fi
 
 echo "==> Host: $HOST"
 if [ -d "$DOTS/hosts/$HOST" ]; then
+    # Through install_list, so a renamed host package is named and skipped
+    # rather than aborting the run before anything is linked.
     [ -f "$DOTS/hosts/$HOST/packages.txt" ] && \
-        sudo pacman -S --needed --noconfirm $(cat "$DOTS/hosts/$HOST/packages.txt")
+        install_list "$DOTS/hosts/$HOST/packages.txt"
     [ -f "$DOTS/hosts/$HOST/hyprland.conf" ] && \
         ln -sfn "$DOTS/hosts/$HOST/hyprland.conf" "$DOTS/dotfiles/hypr/host.conf"
-    [ -x "$DOTS/hosts/$HOST/setup.sh" ] && "$DOTS/hosts/$HOST/setup.sh"
+    # Guarded: these enable services, and a unit that is not installed is a
+    # normal outcome on a half-built machine. It is worth reporting, not worth
+    # losing every symlink over — and this runs before all of them.
+    if [ -x "$DOTS/hosts/$HOST/setup.sh" ]; then
+        "$DOTS/hosts/$HOST/setup.sh" || {
+            echo "    hosts/$HOST/setup.sh failed — continuing"
+            SCRIPT_FAILED+=("hosts/$HOST/setup.sh")
+        }
+    fi
 else
     echo "    no hosts/$HOST folder — using auto-detected defaults"
     echo "monitor = , preferred, auto, 1" > "$DOTS/dotfiles/hypr/host.conf"
@@ -160,7 +183,14 @@ systemctl --user enable --now dots-status.timer dots-pacman.path dots-mail.timer
 echo "    dots-status.timer, dots-pacman.path, dots-mail.timer, dots-news.timer"
 
 echo "==> System scripts"
-for s in "$DOTS"/scripts/*.sh; do "$s"; done
+# Each on its own. These enable services and set default applications, so a
+# failure usually means one package is missing — which must not silently skip
+# every later script and abort before the verification block. Alphabetical
+# order meant a missing bluez took defaults, hardware, snapper and syncthing
+# with it.
+for s in "$DOTS"/scripts/*.sh; do
+    "$s" || { echo "    $(basename "$s") failed — continuing"; SCRIPT_FAILED+=("$(basename "$s")"); }
+done
 
 
 echo "==> Verifying"
@@ -193,6 +223,18 @@ if [ ${#PKG_FAILED[@]} -gt 0 ]; then
     Everything else was installed and all configuration was linked. Usually a
     package has been renamed or dropped from the repos: check with
     'pacman -Ss <name>', then fix the list and 'dots add' the new name.
+EOF
+fi
+
+if [ ${#SCRIPT_FAILED[@]} -gt 0 ]; then
+    cat <<EOF
+
+    NOTE: these setup scripts did not finish:
+        ${SCRIPT_FAILED[*]}
+
+    Everything else was linked and configured. These enable services and set
+    default applications, so the usual cause is a package that is not
+    installed. Run the script by hand to see what it says.
 EOF
 fi
 
