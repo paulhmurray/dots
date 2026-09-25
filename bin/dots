@@ -59,8 +59,15 @@ cmd_upgrade() {
     if [ "$before" != "$after" ]; then
         echo
         echo "    Reboot needed: the running system no longer matches what is on disk."
+        # || true, and it is load-bearing. diff exits 1 to mean "they differ",
+        # which is the whole reason we are in this branch, and pipefail makes
+        # that the pipeline's status. Bare, it killed the command under set -e
+        # at the exact moment an upgrade turned out to need a reboot — so
+        # `dots add` upgraded and then never installed, and `dots sync`
+        # upgraded and then never ran install.sh. Both looked like they had
+        # finished, because the last thing printed was a useful message.
         diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") \
-            | grep '^>' | sed 's/^> /      /'
+            | grep '^>' | sed 's/^> /      /' || true
     fi
     refresh_status
 }
