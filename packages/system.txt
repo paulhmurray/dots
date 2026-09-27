@@ -17,3 +17,4 @@ plocate
 pacman-contrib
 mesa-utils
 w3m
+fastfetch
