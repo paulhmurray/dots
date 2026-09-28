@@ -15,14 +15,21 @@ Singleton {
     property int  dirty: 0
     property var  drift: []
     property var  aurDrift: []
+    property var  reboot: []
     property bool stale: false
     property bool clean: true
     property string theme: ""
 
     // One number for the badge. Commits and packages are different kinds of
     // thing, but the bar only needs "how many things want attention".
+    // A pending reboot counts as one thing, not one per package: "reboot" is a
+    // single action however many packages are behind it. Unlike available
+    // updates — deliberately kept off the bar because Arch always has some —
+    // this is rare and clears itself the moment you act on it, so a lit badge
+    // means something.
     readonly property int count:
         behind + ahead + dirty + drift.length + aurDrift.length
+        + (reboot.length > 0 ? 1 : 0)
 
     // Available updates, deliberately NOT part of status.json and never shown
     // on the bar: Arch always has updates, so an indicator driven by them is
@@ -80,6 +87,7 @@ Singleton {
         if (dirty > 0)          bits.push(dirty + " uncommitted file(s)");
         if (drift.length > 0)   bits.push("not in any list: " + drift.join(" "));
         if (aurDrift.length > 0) bits.push("AUR, not listed: " + aurDrift.join(" "));
+        if (reboot.length > 0)  bits.push("reboot needed: " + reboot.join(", "));
         if (stale)              bits.push("(last check could not reach GitHub)");
         return bits.length > 0 ? bits.join("\n") : "up to date";
     }
@@ -107,6 +115,7 @@ Singleton {
             root.dirty    = (d.dirty ?? []).length;
             root.drift    = d.drift ?? [];
             root.aurDrift = d.aur_drift ?? [];
+            root.reboot   = d.reboot ?? [];
             root.stale    = d.stale ?? false;
             root.theme    = d.theme ?? "";
             root.clean    = d.clean ?? true;
@@ -131,6 +140,6 @@ Singleton {
 
         // No file yet (first boot, before the timer has run). Say nothing
         // rather than claiming something is wrong.
-        onLoadFailed: root.clean = true
+        onLoadFailed: { root.clean = true; root.reboot = []; }
     }
 }

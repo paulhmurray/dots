@@ -41,33 +41,30 @@ refresh_status() { cmd_status --write >/dev/null 2>&1 || true; }
 # half of the machine would silently rot. Interactive on purpose — no
 # --noconfirm here, unlike install.sh, which installs a list you already chose.
 cmd_upgrade() {
-    local before after
-    before=$(dots_reboot_watch)
     echo "==> Full system upgrade (repo + AUR)"
     # Guarded: bin/dots runs under set -e, and yay exits non-zero both when a
-    # package fails to build and when you simply answer n at its [Y/n]. Left
-    # bare, either one killed the whole command at this line — which mattered
-    # most inside sync, where the pull had already happened and install.sh had
-    # not yet run.
+    # package fails to build and when you answer n at its [Y/n]. Left bare,
+    # either one killed the whole command at this line — which mattered most
+    # inside sync, where the pull had already happened and install.sh had not
+    # yet run.
     if ! yay -Syu; then
         echo >&2
         echo "    Upgrade did not complete — declined at the prompt, or a" >&2
         echo "    package failed. Nothing else was changed." >&2
         return 1
     fi
-    after=$(dots_reboot_watch)
-    if [ "$before" != "$after" ]; then
+
+    # Asked of the system rather than diffed across this one run, so it also
+    # catches a reboot you were told about last week and did not take. There is
+    # no pipeline here any more: the diff this replaced exited 1 to mean "they
+    # differ", which under pipefail and set -e killed the command at the exact
+    # moment it had something worth saying.
+    local pending
+    pending=$(dots_reboot_pending)
+    if [ -n "$pending" ]; then
         echo
         echo "    Reboot needed: the running system no longer matches what is on disk."
-        # || true, and it is load-bearing. diff exits 1 to mean "they differ",
-        # which is the whole reason we are in this branch, and pipefail makes
-        # that the pipeline's status. Bare, it killed the command under set -e
-        # at the exact moment an upgrade turned out to need a reboot — so
-        # `dots add` upgraded and then never installed, and `dots sync`
-        # upgraded and then never ran install.sh. Both looked like they had
-        # finished, because the last thing printed was a useful message.
-        diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") \
-            | grep '^>' | sed 's/^> /      /' || true
+        sed 's/^/      /' <<<"$pending"
     fi
     refresh_status
 }
@@ -434,11 +431,12 @@ cmd_status() {
             || stale=true
     fi
 
-    local behind ahead drift aur_drift dirty
+    local behind ahead drift aur_drift dirty reboot
     IFS=$'\t' read -r behind ahead < <(dots_behind_ahead)
     drift=$(dots_drift)
     aur_drift=$(dots_aur_drift)
     dirty=$(dots_dirty)
+    reboot=$(dots_reboot_pending)
 
     if [ "$json" = 1 ] || [ "$write" = 1 ]; then
         local doc
@@ -450,13 +448,15 @@ cmd_status() {
             --argjson dirty "$(printf '%s' "$dirty" | jq -R -s 'split("\n") | map(select(length > 0))')" \
             --argjson drift "$(printf '%s' "$drift" | jq -R -s 'split("\n") | map(select(length > 0))')" \
             --argjson aur_drift "$(printf '%s' "$aur_drift" | jq -R -s 'split("\n") | map(select(length > 0))')" \
+            --argjson reboot "$(printf '%s' "$reboot" | jq -R -s 'split("\n") | map(select(length > 0))')" \
             --arg     checked_at "$(date -Is)" \
             --argjson stale "$stale" \
             '{host: $host, theme: $theme, behind: $behind, ahead: $ahead,
               dirty: $dirty, drift: $drift, aur_drift: $aur_drift,
-              checked_at: $checked_at, stale: $stale,
+              reboot: $reboot, checked_at: $checked_at, stale: $stale,
               clean: (($behind + $ahead) == 0 and ($dirty | length) == 0
-                      and ($drift | length) == 0 and ($aur_drift | length) == 0)}')
+                      and ($drift | length) == 0 and ($aur_drift | length) == 0
+                      and ($reboot | length) == 0)}')
         if [ "$write" = 1 ]; then
             mkdir -p "$DOTS_CACHE"
             printf '%s\n' "$doc" > "$DOTS_CACHE/status.json"
@@ -482,6 +482,11 @@ cmd_status() {
     if [ -n "$aur_drift" ]; then
         echo "aur       $(wc -l <<<"$aur_drift") AUR package(s) in no list"
         tr '\n' ' ' <<<"$aur_drift" | fold -s -w 64 | sed 's/^/            /'
+        said=1
+    fi
+    if [ -n "$reboot" ]; then
+        echo "reboot    $(wc -l <<<"$reboot") package(s) upgraded since boot — systemctl reboot"
+        sed 's/^/            /' <<<"$reboot"
         said=1
     fi
     [ "$said" = 0 ] && echo "up to date   ($(dots_host), theme $(dots_theme))"

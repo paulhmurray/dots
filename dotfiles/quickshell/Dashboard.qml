@@ -233,7 +233,7 @@ PanelWindow {
 
                         Txt {
                             width: parent.width
-                            visible: Sync.gitLines.length === 0
+                            visible: Sync.gitLines.length === 0 && Sync.reboot.length === 0
                             text: "󰄬  " + (Sync.stale ? "up to date (check failed)" : "up to date")
                             color: Sync.stale ? Colours.dim : Colours.green
                         }
@@ -249,6 +249,26 @@ PanelWindow {
                                     text: "󰅢  " + modelData
                                     color: Colours.accent
                                 }
+                            }
+                        }
+
+                        // Above drift because it is the more urgent of the two,
+                        // and named rather than counted: "reboot needed" invites
+                        // "for what?", and the answer is usually the kernel.
+                        Column {
+                            width: parent.width
+                            spacing: 2
+                            visible: Sync.reboot.length > 0
+                            Txt {
+                                text: "󰜉  reboot needed"
+                                color: Colours.red
+                            }
+                            Txt {
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                text: Sync.reboot.join("  ")
+                                color: Colours.dim
+                                font.pixelSize: 11
                             }
                         }
 

@@ -34,6 +34,38 @@ DOTS_GENERATED=(
 # The || true matters: grep exits 1 when nothing matches, and this runs inside
 # a command substitution under set -euo pipefail, so an empty result would kill
 # the upgrade rather than report "nothing worth rebooting for".
+# Whether the running system still matches what is on disk.
+#
+# Derived from the system itself, not remembered. The old answer was a
+# before/after comparison inside cmd_upgrade, so it existed only for the few
+# seconds that command was running: look away and nothing ever mentioned it
+# again. Worse, the run that printed it was frequently the one that ended
+# immediately afterwards, so the single notice was also the last thing it said.
+#
+# A watched package whose install date is later than the boot time has not been
+# loaded by the running kernel or init. That is true whenever it is asked,
+# survives every session, and a reboot clears it without anything having to be
+# reset — there is no marker to go stale or get out of step.
+dots_reboot_pending() {
+    local btime name ver desc when out=()
+    btime=$(awk '/^btime/{print $2; exit}' /proc/stat 2>/dev/null || true)
+    [ -n "$btime" ] || return 0
+    while read -r name ver; do
+        [ -n "${name:-}" ] || continue
+        desc="/var/lib/pacman/local/$name-$ver/desc"
+        [ -r "$desc" ] || continue
+        when=$(awk '/^%INSTALLDATE%/{getline; print; exit}' "$desc" 2>/dev/null || true)
+        [ -n "$when" ] || continue
+        if [ "$when" -gt "$btime" ]; then
+            out+=("$name $ver")
+        fi
+    done < <(dots_reboot_watch)
+    if [ ${#out[@]} -gt 0 ]; then
+        printf '%s\n' "${out[@]}"
+    fi
+    return 0
+}
+
 dots_reboot_watch() {
     pacman -Q 2>/dev/null | grep -E \
         '^(linux|linux-lts|linux-zen|linux-hardened|linux-firmware[^ ]*|nvidia[^ ]*|systemd|amd-ucode|intel-ucode|mesa|aquamarine) ' \
