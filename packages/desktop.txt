@@ -15,3 +15,7 @@ noto-fonts-cjk
 noto-fonts-emoji
 thunderbird
 newsboat
+libreoffice-fresh
+ttf-carlito
+ttf-liberation
+ttf-caladea
