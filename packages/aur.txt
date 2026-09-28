@@ -2,3 +2,4 @@ localsend-bin
 tauon-music-box
 uhk-agent-appimage
 rdrview
+claude-code
