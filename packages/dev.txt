@@ -8,3 +8,4 @@ lazygit
 cmake
 ninja
 llvm
+qwen-code
