@@ -218,6 +218,28 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.opt_local.breakindent = true  -- continuation lines keep the indent
     vim.opt_local.number = false      -- line numbers earn nothing in prose
     vim.opt_local.relativenumber = false
+
+    -- Spell check. en_au rather than plain en, so "color" is flagged and
+    -- "colour" is not; both are in the one en.utf-8.spl that ships with nvim,
+    -- so this needs nothing downloaded.
+    --
+    -- Not as noisy as it sounds: nvim-orgmode's treesitter highlights.scm
+    -- marks headlines, paragraphs and list items @spell, and TODO/DONE
+    -- keywords and link URLs @nospell, so only prose is checked. Property
+    -- drawers, timestamps and #+DIRECTIVES are never captured and so are
+    -- skipped too.
+    vim.opt_local.spell = true
+    vim.opt_local.spelllang = "en_au"
+
+    -- The personal dictionary lives with the journal, not in this repo. zg on
+    -- a name writes it here, Syncthing carries it to the other machine, and it
+    -- stays out of a public repo — the words you add are mostly the names of
+    -- people and places you know.
+    local dict = vim.fn.expand("~/orgfiles/spell")
+    if vim.fn.isdirectory(dict) == 0 then
+      vim.fn.mkdir(dict, "p")
+    end
+    vim.opt_local.spellfile = dict .. "/en.utf-8.add"
   end,
 })
 
