@@ -55,6 +55,22 @@ require("lazy").setup({
         org_default_notes_file = "~/orgfiles/refile.org",
         org_todo_keywords = { "TODO", "NEXT", "WAITING", "|", "DONE", "CANCELLED" },
         org_startup_folded = "content",
+
+        -- Capture and the agenda open as a centred float rather than a
+        -- 16-line split along the bottom of the screen. Journalling is what
+        -- this is mostly used for, and a strip at the foot of a 3440px-wide
+        -- monitor is a cramped and oddly-shaped place to write prose.
+        win_split_mode = { "float", 0.85 },
+        win_border = "rounded",
+
+        -- Stars and emphasis markers are markup, not content. org-bullets
+        -- already draws a bullet per level, so showing the stars as well is
+        -- noise; hiding the leading ones leaves the bullet sitting at the
+        -- indent its level implies. Needs conceallevel, which the plugin does
+        -- not set itself — see the FileType autocmd near the bottom.
+        org_hide_leading_stars = true,
+        org_hide_emphasis_markers = true,
+        org_ellipsis = "  ⋯",
         -- The existing journal body text sits flush left, not indented under
         -- the headline; keep new entries matching.
         org_adapt_indentation = false,
@@ -149,6 +165,26 @@ map("<leader>ofs", "<cmd>edit ~/orgfiles/shell-in-c-12-weeks.org<cr>", "Shell in
 map("<leader>ofr", "<cmd>edit ~/orgfiles/refile.org<cr>", "Refile")
 map("<leader>ocj", function() require("orgmode").capture:open_template_by_shortcut("j") end, "Journal entry")
 map("<Esc>", "<cmd>nohlsearch<cr>", "Clear search")
+
+-- Org buffers are prose, so they get prose settings rather than the code
+-- defaults. conceallevel is the load-bearing one: org_hide_leading_stars and
+-- org_hide_emphasis_markers are both implemented with conceal, and nvim-orgmode
+-- does not set it, so without this they are configured and do nothing.
+--
+-- concealcursor is deliberately left empty: markers reappear on the line the
+-- cursor is on, which is what you want while editing and not while reading.
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "org",
+  callback = function()
+    vim.opt_local.conceallevel = 2
+    vim.opt_local.concealcursor = ""
+    vim.opt_local.wrap = true
+    vim.opt_local.linebreak = true    -- break between words, not mid-word
+    vim.opt_local.breakindent = true  -- continuation lines keep the indent
+    vim.opt_local.number = false      -- line numbers earn nothing in prose
+    vim.opt_local.relativenumber = false
+  end,
+})
 
 -- jk leaves insert mode, the habit carried over from evil-escape in Doom.
 -- Also mapped in terminal mode, where <Esc> is usually swallowed by the shell.
