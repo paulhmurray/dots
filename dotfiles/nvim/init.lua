@@ -240,6 +240,41 @@ vim.api.nvim_create_autocmd("FileType", {
       vim.fn.mkdir(dict, "p")
     end
     vim.opt_local.spellfile = dict .. "/en.utf-8.add"
+
+    -- See the checktime autocmds below for why this matters here.
+    vim.opt_local.autoread = true
+  end,
+})
+
+-- Syncthing carries ~/orgfiles between the two machines, and it does not merge.
+-- When the same file changes in both places it keeps one copy and parks the
+-- other as journal.sync-conflict-<date>.org, which is easy not to notice — one
+-- sat here for two days holding an entry that existed nowhere else.
+--
+-- The usual way to cause that is to leave the journal open in nvim on one
+-- machine and write on the other: the buffer here is now stale, and the next
+-- :w sends a whole file back that never saw the other machine's entry.
+--
+-- autoread fixes the harmless half of that — an unmodified buffer quietly
+-- takes the newer file — but autoread only acts when nvim looks, and nvim only
+-- looks on certain events. checktime is what makes it look. The dangerous half
+-- (changed on disk AND unsaved changes here) nvim refuses to resolve on its
+-- own and prompts, which is the correct answer: that one needs a human.
+--
+-- Registered once at top level, not inside the FileType callback, which would
+-- add another copy of each autocmd for every org buffer opened.
+vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "CursorHold" }, {
+  pattern = "*.org",
+  command = "silent! checktime",
+})
+
+vim.api.nvim_create_autocmd("FileChangedShellPost", {
+  pattern = "*.org",
+  callback = function(ev)
+    vim.notify(
+      ("%s changed on disk and was reloaded"):format(vim.fn.fnamemodify(ev.file, ":t")),
+      vim.log.levels.WARN
+    )
   end,
 })
 
