@@ -177,6 +177,51 @@ vim.api.nvim_create_autocmd("BufWritePre", {
   callback = function() vim.lsp.buf.format({ async = false }) end,
 })
 
+-- Org buffers are prose, so they get prose settings rather than the code
+-- defaults. conceallevel is the load-bearing one: org_hide_leading_stars and
+-- org_hide_emphasis_markers are both implemented with conceal, and nvim-orgmode
+-- does not set it, so without this they are configured and do nothing.
+--
+-- A function rather than an inline callback because almost all of these are
+-- WINDOW-local, not buffer-local. FileType fires once per buffer load, so a
+-- second window onto an already-loaded org buffer — which is exactly what the
+-- journal float is — gets the global defaults instead: numbers on, conceal
+-- off, no spell. Both paths call this.
+local function org_window_opts()
+  vim.opt_local.conceallevel = 2
+  -- Markers reappear on the line the cursor is on, which is what you want
+  -- while editing and not while reading.
+  vim.opt_local.concealcursor = ""
+  vim.opt_local.wrap = true
+  vim.opt_local.linebreak = true    -- break between words, not mid-word
+  vim.opt_local.breakindent = true  -- continuation lines keep the indent
+  vim.opt_local.number = false      -- line numbers earn nothing in prose
+  vim.opt_local.relativenumber = false
+
+  -- en_au rather than plain en, so "color" is flagged and "colour" is not;
+  -- both are in the one en.utf-8.spl that ships with nvim, so this needs
+  -- nothing downloaded. Not as noisy as it sounds: nvim-orgmode's treesitter
+  -- highlights.scm marks headlines, paragraphs and list items @spell, and
+  -- TODO/DONE keywords and link URLs @nospell, so only prose is checked.
+  vim.opt_local.spell = true
+  vim.opt_local.spelllang = "en_au"
+
+  -- The personal dictionary lives with the journal, not in this repo. zg on a
+  -- name writes it here, Syncthing carries it to the other machine, and it
+  -- stays out of a public repo — the words you add are mostly the names of
+  -- people and places you know.
+  local dict = vim.fn.expand("~/orgfiles/spell")
+  if vim.fn.isdirectory(dict) == 0 then
+    vim.fn.mkdir(dict, "p")
+  end
+  vim.opt_local.spellfile = dict .. "/en.utf-8.add"
+
+  -- See the checktime autocmds below for why this matters here.
+  vim.opt_local.autoread = true
+end
+
+vim.api.nvim_create_autocmd("FileType", { pattern = "org", callback = org_window_opts })
+
 -- keymaps
 local map = function(keys, fn, desc)
   vim.keymap.set("n", keys, fn, { desc = desc })
@@ -199,52 +244,88 @@ map("<leader>oft", "<cmd>edit ~/orgfiles/todo.org<cr>", "Todo")
 map("<leader>ofs", "<cmd>edit ~/orgfiles/shell-in-c-12-weeks.org<cr>", "Shell in C plan")
 map("<leader>ofr", "<cmd>edit ~/orgfiles/refile.org<cr>", "Refile")
 map("<leader>ocj", function() require("orgmode").capture:open_template_by_shortcut("j") end, "Journal entry")
-map("<Esc>", "<cmd>nohlsearch<cr>", "Clear search")
 
--- Org buffers are prose, so they get prose settings rather than the code
--- defaults. conceallevel is the load-bearing one: org_hide_leading_stars and
--- org_hide_emphasis_markers are both implemented with conceal, and nvim-orgmode
--- does not set it, so without this they are configured and do nothing.
+-- Reopen the journal in the same float the capture uses.
 --
--- concealcursor is deliberately left empty: markers reappear on the line the
--- cursor is on, which is what you want while editing and not while reading.
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = "org",
-  callback = function()
-    vim.opt_local.conceallevel = 2
-    vim.opt_local.concealcursor = ""
-    vim.opt_local.wrap = true
-    vim.opt_local.linebreak = true    -- break between words, not mid-word
-    vim.opt_local.breakindent = true  -- continuation lines keep the indent
-    vim.opt_local.number = false      -- line numbers earn nothing in prose
-    vim.opt_local.relativenumber = false
+-- The capture template is append-only by design: it always starts a NEW entry
+-- under today's date, so there is no way through it to carry on with one you
+-- began earlier. Doing that in the file meant a split at the bottom of the
+-- screen, which is a jarring change of context after writing the first half in
+-- a centred float.
+--
+-- This is the real journal.org buffer in a float, not a copy: :w writes the
+-- actual file and there is nothing to synchronise back, which also means it
+-- cannot invent the kind of divergence Syncthing turns into a conflict file.
+local function journal_float()
+  -- The same arithmetic as orgmode's utils.open_float at the same scale, so
+  -- this window and the capture window are the same size in the same place.
+  -- The window opens on a throwaway scratch buffer and the file is read into
+  -- it afterwards, rather than the other way round.
+  local scale = 0.85
+  local width = math.floor(vim.o.columns * scale)
+  local height = math.floor(vim.o.lines * scale)
+  local win = vim.api.nvim_open_win(vim.api.nvim_create_buf(false, true), true, {
+    relative = "editor",
+    width = width,
+    height = height,
+    row = math.floor(((vim.o.lines - height) / 2) - 1),
+    col = math.floor((vim.o.columns - width) / 2),
+    border = "rounded",
+    title = " journal ",
+    title_pos = "center",
+  })
 
-    -- Spell check. en_au rather than plain en, so "color" is flagged and
-    -- "colour" is not; both are in the one en.utf-8.spl that ships with nvim,
-    -- so this needs nothing downloaded.
-    --
-    -- Not as noisy as it sounds: nvim-orgmode's treesitter highlights.scm
-    -- marks headlines, paragraphs and list items @spell, and TODO/DONE
-    -- keywords and link URLs @nospell, so only prose is checked. Property
-    -- drawers, timestamps and #+DIRECTIVES are never captured and so are
-    -- skipped too.
-    vim.opt_local.spell = true
-    vim.opt_local.spelllang = "en_au"
+  -- :edit, not bufadd + bufload. bufload raises a Lua error when a swap file
+  -- exists — the journal open in another nvim, or one that crashed earlier —
+  -- so the key failed with a stack traceback instead of vim's own ATTENTION
+  -- prompt, which is the thing that actually explains the situation and
+  -- offers recovery. :edit keeps that handling, inside this window.
+  if not pcall(vim.cmd.edit, vim.fn.fnameescape(vim.fn.expand("~/orgfiles/journal.org"))) then
+    pcall(vim.api.nvim_win_close, win, true)
+    vim.notify("journal: could not open ~/orgfiles/journal.org", vim.log.levels.ERROR)
+    return
+  end
+  local bufnr = vim.api.nvim_get_current_buf()
 
-    -- The personal dictionary lives with the journal, not in this repo. zg on
-    -- a name writes it here, Syncthing carries it to the other machine, and it
-    -- stays out of a public repo — the words you add are mostly the names of
-    -- people and places you know.
-    local dict = vim.fn.expand("~/orgfiles/spell")
-    if vim.fn.isdirectory(dict) == 0 then
-      vim.fn.mkdir(dict, "p")
+  -- Explicit, because almost everything org_window_opts sets is window-local
+  -- and FileType does not fire again for a buffer that is already loaded —
+  -- which is the normal case here, the journal usually being open already.
+  org_window_opts()
+
+  -- Land at the end of today's entry, which is where you left off. Today's
+  -- section runs to the next top-level heading, or to the end of the file.
+  vim.fn.cursor(1, 1)
+  if vim.fn.search("^\\* " .. os.date("%Y-%m-%d"), "cW") > 0 then
+    local nxt = vim.fn.search("^\\* ", "W")
+    vim.fn.cursor(nxt > 0 and nxt - 1 or vim.fn.line("$"), 1)
+  else
+    vim.cmd("normal! G")
+  end
+  vim.cmd("normal! zz")
+
+  -- <C-c> finishes, the same key that finalises a capture, so the two windows
+  -- are driven the same way. Not mapped to q on purpose: q is macro recording,
+  -- and this is a real file buffer where losing that would be felt.
+  vim.keymap.set("n", "<C-c>", function()
+    if vim.bo[bufnr].modified then
+      vim.cmd("write")
     end
-    vim.opt_local.spellfile = dict .. "/en.utf-8.add"
+    pcall(vim.api.nvim_win_close, win, false)
+  end, { buffer = bufnr, desc = "Save and close the journal float" })
 
-    -- See the checktime autocmds below for why this matters here.
-    vim.opt_local.autoread = true
-  end,
-})
+  -- Buffer-local mappings outlive the window, and journal.org is a file you
+  -- also open normally, where <C-c> meaning "write and close" would be a
+  -- surprise. Drop it when the float goes.
+  vim.api.nvim_create_autocmd("WinClosed", {
+    pattern = tostring(win),
+    once = true,
+    callback = function()
+      pcall(vim.keymap.del, "n", "<C-c>", { buffer = bufnr })
+    end,
+  })
+end
+map("<leader>oj", journal_float, "Journal float (continue today)")
+map("<Esc>", "<cmd>nohlsearch<cr>", "Clear search")
 
 -- Syncthing carries ~/orgfiles between the two machines, and it does not merge.
 -- When the same file changes in both places it keeps one copy and parks the
