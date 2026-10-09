@@ -109,6 +109,16 @@ require("lazy").setup({
         { "<leader>r", group = "refactor" },
         { "<leader>o", group = "org" },
         { "<leader>of", group = "org files" },
+        -- nvim-orgmode's own prefixes. It registers the leaf mappings with
+        -- descriptions but never names the groups they sit under, so which-key
+        -- had nothing to show and fell back to "+7 keymaps" — a count, which
+        -- tells you there is something there and nothing about what.
+        { "<leader>ob", group = "babel" },   -- bt  tangle
+        { "<leader>od", group = "dates" },   -- d!  toggle timestamp type
+        { "<leader>oi", group = "insert" },  -- i. i! id is it iT ih
+        { "<leader>ol", group = "links" },   -- li ls
+        { "<leader>on", group = "notes" },   -- na  add note
+        { "<leader>ox", group = "clock" },   -- xi xo xq xj xe
       },
     } },
 })
