@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Tiller
+GenericName=Journal and notes
+Comment=Journal, zettelkasten notes and goals on the scratchpad — Super+O toggles it
+Exec=tiller-window show
+Icon=utilities-terminal
+Terminal=false
+Categories=Office;Utility;
+Keywords=journal;notes;goals;org;
+StartupNotify=false

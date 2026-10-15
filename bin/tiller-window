@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Show and hide tiller (journal, notes, goals) over your work.
+#
+# tiller is a terminal program, so the scratchpad window is a foot instance
+# with its own app-id — that is what the Hyprland rule matches on, rather than
+# catching every terminal you have open. Quitting tiller (q) closes the window;
+# the next toggle starts a fresh one. The binary itself comes from
+# scripts/tiller.sh.
+set -euo pipefail
+
+APPID=dots-tiller
+
+running() { pgrep -f "foot --app-id=$APPID" >/dev/null 2>&1; }
+
+ensure() {
+    running && return 0
+    command -v tiller >/dev/null || { notify-send "tiller" "not installed: run ~/dots/scripts/tiller.sh" 2>/dev/null; return 1; }
+    setsid foot --app-id="$APPID" -e tiller >/dev/null 2>&1 &
+    for _ in $(seq 1 30); do
+        sleep 0.2
+        running && return 0
+    done
+    echo "tiller-window: foot did not start" >&2
+    return 1
+}
+
+case "${1:-window}" in
+    ensure) ensure ;;
+
+    # Toggle it over your work, like mail, music and news.
+    window)
+        ensure
+        command -v hyprctl >/dev/null && \
+            hyprctl dispatch togglespecialworkspace tiller >/dev/null 2>&1 || true
+        ;;
+
+    # Always bring it into view — for the launcher, which must never hide.
+    show)
+        ensure
+        if command -v hyprctl >/dev/null; then
+            shown=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].specialWorkspace.name // ""')
+            [ "$shown" = "special:tiller" ] || hyprctl dispatch togglespecialworkspace tiller >/dev/null 2>&1 || true
+        fi
+        ;;
+
+    *)
+        cat <<'USAGE'
+usage: tiller-window [command]
+
+  window   show/hide tiller over your work (default)
+  show     bring it into view (never hides)
+  ensure   start it if it is not running
+USAGE
+        exit 2 ;;
+esac
