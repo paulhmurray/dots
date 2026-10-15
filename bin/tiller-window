@@ -10,7 +10,7 @@ set -euo pipefail
 
 APPID=dots-tiller
 
-running() { pgrep -f "foot --app-id=$APPID" >/dev/null 2>&1; }
+running() { pgrep -f "^foot --app-id=$APPID" >/dev/null 2>&1; }
 
 ensure() {
     running && return 0
