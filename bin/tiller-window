@@ -24,22 +24,34 @@ ensure() {
     return 1
 }
 
+# The special workspace is shown on the focused monitor, so that is the one
+# to ask.
+shown() {
+    [ "$(hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.focused) | .specialWorkspace.name // ""')" = "special:tiller" ]
+}
+
+focus() { hyprctl dispatch focuswindow "class:^($APPID)$" >/dev/null 2>&1 || true; }
+
 case "${1:-window}" in
     ensure) ensure ;;
 
-    # Toggle it over your work, like mail, music and news.
+    # Toggle it over your work, like mail, music and news. When it comes up
+    # it also takes keyboard focus, so you can drive it without reaching for
+    # the mouse, wherever the pointer happens to be.
     window)
         ensure
-        command -v hyprctl >/dev/null && \
+        if command -v hyprctl >/dev/null; then
             hyprctl dispatch togglespecialworkspace tiller >/dev/null 2>&1 || true
+            shown && focus
+        fi
         ;;
 
     # Always bring it into view — for the launcher, which must never hide.
     show)
         ensure
         if command -v hyprctl >/dev/null; then
-            shown=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].specialWorkspace.name // ""')
-            [ "$shown" = "special:tiller" ] || hyprctl dispatch togglespecialworkspace tiller >/dev/null 2>&1 || true
+            shown || hyprctl dispatch togglespecialworkspace tiller >/dev/null 2>&1 || true
+            focus
         fi
         ;;
 
