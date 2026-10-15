@@ -51,7 +51,7 @@ require("lazy").setup({
     dependencies = { "nvim-orgmode/org-bullets.nvim" },
     config = function()
       require("orgmode").setup({
-        org_agenda_files = { "~/orgfiles/*.org", "~/orgfiles/zettelkasten/*.org" },
+        org_agenda_files = { "~/orgfiles/*.org", "~/orgfiles/journal/*.org", "~/orgfiles/notes/*.org" },
         org_default_notes_file = "~/orgfiles/refile.org",
         org_todo_keywords = { "TODO", "NEXT", "WAITING", "|", "DONE", "CANCELLED" },
         org_startup_folded = "content",
@@ -75,21 +75,12 @@ require("lazy").setup({
         -- the headline; keep new entries matching.
         org_adapt_indentation = false,
         org_capture_templates = {
-          -- journal.org format: "* 2026-07-15 Wednesday", "** Title", body.
-          -- A single-level datetree keeps that flat shape (the built-in "day"
-          -- tree nests year/month/day) and reuses the same-day heading when a
-          -- second entry is written on the same day instead of stacking dates.
+          -- One file per day under ~/orgfiles/journal (tiller layout). The
+          -- target expands %<...> with os.date, so no datetree is needed;
+          -- a second capture on the same day appends another "* " entry.
           j = {
             description = "Journal",
-            target = "~/orgfiles/journal.org",
-            datetree = {
-              tree_type = "custom",
-              tree = { {
-                format = "%Y-%m-%d %A",
-                pattern = "^(%d%d%d%d)%-(%d%d)%-(%d%d).*$",
-                order = { 1, 2, 3 },
-              } },
-            },
+            target = "~/orgfiles/journal/%<%Y-%m-%d>.org",
             template = "* %?",
           },
           t = {
