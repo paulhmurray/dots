@@ -94,6 +94,10 @@ require("lazy").setup({
     end },
   { "folke/which-key.nvim", event = "VeryLazy",
     opts = {
+      -- Show the popup as soon as a prefix is pressed, not after a pause: it
+      -- is the menu, so there is nothing to wait for. It stays until a key
+      -- completes the mapping or <Esc> cancels. (timeoutlen stays 400 for jk.)
+      delay = 0,
       -- Every group has a title and every leaf a plain sentence. nvim-orgmode
       -- registers its mappings with terse "org ..." descriptions and never
       -- names the groups, so which-key showed "+7 keymaps"; the entries below
@@ -102,6 +106,28 @@ require("lazy").setup({
         { "<leader>f", group = "find" },
         { "<leader>c", group = "code" },
         { "<leader>r", group = "refactor" },
+
+        -- Neovim's own bracket motions (:help [a and friends), which it
+        -- registers without descriptions, so which-key showed "23 keymaps".
+        { "[", group = "previous / first" },
+        { "]", group = "next / last" },
+        { "[a", desc = "Previous argument" }, { "]a", desc = "Next argument" },
+        { "[A", desc = "First argument" }, { "]A", desc = "Last argument" },
+        { "[b", desc = "Previous buffer" }, { "]b", desc = "Next buffer" },
+        { "[B", desc = "First buffer" }, { "]B", desc = "Last buffer" },
+        { "[q", desc = "Previous quickfix item" }, { "]q", desc = "Next quickfix item" },
+        { "[Q", desc = "First quickfix item" }, { "]Q", desc = "Last quickfix item" },
+        { "[<C-Q>", desc = "Previous quickfix file" }, { "]<C-Q>", desc = "Next quickfix file" },
+        { "[l", desc = "Previous location-list item" }, { "]l", desc = "Next location-list item" },
+        { "[L", desc = "First location-list item" }, { "]L", desc = "Last location-list item" },
+        { "[<C-L>", desc = "Previous location-list file" }, { "]<C-L>", desc = "Next location-list file" },
+        { "[t", desc = "Previous tag match" }, { "]t", desc = "Next tag match" },
+        { "[T", desc = "First tag match" }, { "]T", desc = "Last tag match" },
+        { "[<C-T>", desc = "Previous tag in preview" }, { "]<C-T>", desc = "Next tag in preview" },
+        { "[d", desc = "Previous diagnostic" }, { "]d", desc = "Next diagnostic" },
+        { "[D", desc = "First diagnostic" }, { "]D", desc = "Last diagnostic" },
+        { "[<Space>", desc = "Add blank line above" }, { "]<Space>", desc = "Add blank line below" },
+        { "[%", desc = "Previous unmatched bracket" }, { "]%", desc = "Next unmatched bracket" },
 
         { "<leader>o", group = "org" },
         { "<leader>oa", desc = "Agenda" },
