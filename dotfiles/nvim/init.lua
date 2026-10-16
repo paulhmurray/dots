@@ -168,6 +168,7 @@ require("lazy").setup({
         { "<leader>ocj", desc = "Journal entry (today)" },
         { "<leader>oj", desc = "Journal: continue today in a float" },
         { "<leader>oo", desc = "Open link or date under cursor" },
+        { "<leader>os", desc = "Spelling: toggle checking in this window" },
         { "<leader>oz", desc = "Tiller: note from this word, stay here" },
         { "<leader>oZ", desc = "Tiller: note from this word, then open it" },
         { "<leader>ot", desc = "Set tags on this heading" },
@@ -348,6 +349,34 @@ map("<leader>e", "<cmd>Explore<cr>", "File explorer")
 -- and press enter to run it. The which-key popup is for browsing a prefix;
 -- this is for when you cannot remember which prefix.
 map("<leader>?", "<cmd>Telescope keymaps<cr>", "Search keymaps by description")
+
+-- Built-in commands are not keymaps, so that search cannot see them and
+-- which-key's labels for them are only labels. Mapping a key to itself with
+-- a description makes it a real, searchable entry without changing what it
+-- does. Spelling first, because that is the one you reach for and forget.
+local function document(mode, keys)
+  for lhs, desc in pairs(keys) do
+    vim.keymap.set(mode, lhs, lhs, { desc = desc, noremap = true })
+  end
+end
+document("n", {
+  ["z="] = "Spelling: suggestions for the word under the cursor",
+  ["zg"] = "Spelling: add word to the dictionary",
+  ["zw"] = "Spelling: mark word as wrong",
+  ["zug"] = "Spelling: undo adding this word",
+  ["]s"] = "Spelling: next misspelled word",
+  ["[s"] = "Spelling: previous misspelled word",
+  ["gqip"] = "Reflow this paragraph",
+  ["gw"] = "Reflow (motion), keep cursor",
+  ["ga"] = "Show character code under cursor",
+  ["g;"] = "Jump to last change",
+  ["gi"] = "Insert where you last left insert mode",
+  ["gv"] = "Reselect last visual selection",
+})
+map("<leader>os", function()
+  vim.wo.spell = not vim.wo.spell
+  vim.notify("spell " .. (vim.wo.spell and "on" or "off"))
+end, "Spelling: toggle checking in this window")
 
 -- org: capture is <leader>oc and agenda <leader>oa (nvim-orgmode defaults).
 -- <leader>ocj goes straight to a journal entry without the template menu.
