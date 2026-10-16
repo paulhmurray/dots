@@ -246,6 +246,52 @@ map("<leader>ofs", "<cmd>edit ~/orgfiles/shell-in-c-12-weeks.org<cr>", "Shell in
 map("<leader>ofr", "<cmd>edit ~/orgfiles/refile.org<cr>", "Refile")
 map("<leader>ocj", function() require("orgmode").capture:open_template_by_shortcut("j") end, "Journal entry")
 
+-- A note from the word under the cursor (or the visual selection), made by
+-- tiller while you keep writing. The new note inherits this note's book tag
+-- and links back here, and the word becomes an [[id:...][...]] link, so
+-- neither note is an orphan. <leader>oz keeps you here; <leader>oZ opens the
+-- new note on its first blank line.
+local function tiller_note_from_text(open_it)
+  local mode = vim.fn.mode()
+  local s_row, s_col, e_row, e_col, text
+  if mode == "v" or mode == "V" then
+    vim.cmd('normal! "zy')
+    text = vim.fn.getreg("z")
+    s_row, s_col = unpack(vim.api.nvim_buf_get_mark(0, "<"))
+    e_row, e_col = unpack(vim.api.nvim_buf_get_mark(0, ">"))
+  else
+    text = vim.fn.expand("<cword>")
+    local line = vim.api.nvim_get_current_line()
+    local col = vim.api.nvim_win_get_cursor(0)[2]
+    local from = vim.fn.matchstrpos(line:sub(1, col + 1), "\\k*$")
+    s_row = vim.api.nvim_win_get_cursor(0)[1]
+    e_row = s_row
+    s_col = from[2]
+    e_col = s_col + #text - 1
+  end
+  text = vim.trim(text)
+  if text == "" then return end
+  local out = vim.fn.system({ "tiller", "new", "-print", "-from", vim.fn.expand("%:p"), text })
+  if vim.v.shell_error ~= 0 then
+    vim.notify("tiller: " .. out, vim.log.levels.ERROR)
+    return
+  end
+  local id, path, title = out:match("^(.-)\t(.-)\t(.-)\n?$")
+  if not id then return end
+  local link = ("[[id:%s][%s]]"):format(id, title)
+  vim.api.nvim_buf_set_text(0, s_row - 1, s_col, e_row - 1, e_col + 1, { link })
+  vim.cmd("silent write")
+  vim.notify("note: " .. title)
+  if open_it then
+    local n = vim.fn.system({ "sh", "-c", "grep -n -m1 '^$' " .. vim.fn.shellescape(path) .. " | cut -d: -f1" })
+    vim.cmd("edit " .. vim.fn.fnameescape(path))
+    vim.api.nvim_win_set_cursor(0, { tonumber(n) or 1, 0 })
+  end
+end
+_G.tiller_note_from_text = tiller_note_from_text
+vim.keymap.set({ "n", "v" }, "<leader>oz", function() tiller_note_from_text(false) end, { desc = "Note from word (stay)" })
+vim.keymap.set({ "n", "v" }, "<leader>oZ", function() tiller_note_from_text(true) end, { desc = "Note from word (open)" })
+
 -- Reopen the journal in the same float the capture uses.
 --
 -- The capture template is append-only by design: it always starts a NEW entry
