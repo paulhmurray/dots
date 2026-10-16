@@ -100,7 +100,14 @@ require("lazy").setup({
     -- popup now stays until a key completes the mapping or <Esc> cancels.
     config = function(_, opts)
       require("which-key").setup(opts)
-      pcall(vim.api.nvim_clear_autocmds, { group = "wk", event = { "FocusLost", "FocusGained" } })
+      -- which-key finishes its own setup on the scheduler, so the "wk"
+      -- group does not exist yet here. Clear once that has run, and again a
+      -- moment later in case the first pass was too early.
+      local function keep_open()
+        pcall(vim.api.nvim_clear_autocmds, { group = "wk", event = { "FocusLost", "FocusGained" } })
+      end
+      vim.schedule(function() vim.schedule(keep_open) end)
+      vim.defer_fn(keep_open, 500)
     end,
     opts = {
       -- Show the popup as soon as a prefix is pressed, not after a pause: it
