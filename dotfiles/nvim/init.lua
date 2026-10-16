@@ -94,22 +94,71 @@ require("lazy").setup({
     end },
   { "folke/which-key.nvim", event = "VeryLazy",
     opts = {
+      -- Every group has a title and every leaf a plain sentence. nvim-orgmode
+      -- registers its mappings with terse "org ..." descriptions and never
+      -- names the groups, so which-key showed "+7 keymaps"; the entries below
+      -- only document, they do not remap. Keys are nvim-orgmode's defaults.
       spec = {
         { "<leader>f", group = "find" },
         { "<leader>c", group = "code" },
         { "<leader>r", group = "refactor" },
+
         { "<leader>o", group = "org" },
-        { "<leader>of", group = "org files" },
-        -- nvim-orgmode's own prefixes. It registers the leaf mappings with
-        -- descriptions but never names the groups they sit under, so which-key
-        -- had nothing to show and fell back to "+7 keymaps" — a count, which
-        -- tells you there is something there and nothing about what.
-        { "<leader>ob", group = "babel" },   -- bt  tangle
-        { "<leader>od", group = "dates" },   -- d!  toggle timestamp type
-        { "<leader>oi", group = "insert" },  -- i. i! id is it iT ih
-        { "<leader>ol", group = "links" },   -- li ls
-        { "<leader>on", group = "notes" },   -- na  add note
-        { "<leader>ox", group = "clock" },   -- xi xo xq xj xe
+        { "<leader>oa", desc = "Agenda" },
+        { "<leader>oc", group = "capture" },
+        { "<leader>ocj", desc = "Journal entry (today)" },
+        { "<leader>oj", desc = "Journal: continue today in a float" },
+        { "<leader>oo", desc = "Open link or date under cursor" },
+        { "<leader>oz", desc = "Tiller: note from this word, stay here" },
+        { "<leader>oZ", desc = "Tiller: note from this word, then open it" },
+        { "<leader>ot", desc = "Set tags on this heading" },
+        { "<leader>or", desc = "Refile this heading elsewhere" },
+        { "<leader>oe", desc = "Export" },
+        { "<leader>oJ", desc = "Move subtree down" },
+        { "<leader>oK", desc = "Move subtree up" },
+        { "<leader>o*", desc = "Toggle line <-> heading" },
+        { "<leader>o,", desc = "Set priority" },
+        { "<leader>o$", desc = "Archive subtree" },
+        { "<leader>oA", desc = "Toggle ARCHIVE tag" },
+        { "<leader><CR>", desc = "New heading, item or row here" },
+
+        { "<leader>of", group = "open file" },
+        { "<leader>ofj", desc = "Journal, today" },
+        { "<leader>ofg", desc = "Goals" },
+        { "<leader>oft", desc = "Todo" },
+        { "<leader>ofr", desc = "Refile" },
+        { "<leader>ofs", desc = "Shell in C plan" },
+        { "<leader>ofn", desc = "Find a note" },
+        { "<leader>ofb", desc = "Find a book file" },
+
+        { "<leader>oi", group = "insert" },
+        { "<leader>oi.", desc = "Timestamp, active" },
+        { "<leader>oi!", desc = "Timestamp, inactive" },
+        { "<leader>oid", desc = "Deadline" },
+        { "<leader>ois", desc = "Schedule" },
+        { "<leader>oih", desc = "Heading after this block" },
+        { "<leader>oit", desc = "TODO heading after this block" },
+        { "<leader>oiT", desc = "TODO heading right after this one" },
+
+        { "<leader>ol", group = "links" },
+        { "<leader>oli", desc = "Insert a link" },
+        { "<leader>ols", desc = "Store a link to here" },
+
+        { "<leader>od", group = "dates" },
+        { "<leader>od!", desc = "Toggle active / inactive timestamp" },
+
+        { "<leader>on", group = "notes" },
+        { "<leader>ona", desc = "Add a log note to this heading" },
+
+        { "<leader>ox", group = "clock" },
+        { "<leader>oxi", desc = "Clock in" },
+        { "<leader>oxo", desc = "Clock out" },
+        { "<leader>oxq", desc = "Cancel the clock" },
+        { "<leader>oxj", desc = "Jump to the running clock" },
+        { "<leader>oxe", desc = "Set effort estimate" },
+
+        { "<leader>ob", group = "babel" },
+        { "<leader>obt", desc = "Tangle code blocks to files" },
       },
     } },
 })
@@ -240,7 +289,21 @@ map("<leader>?", "<cmd>WhichKey<cr>", "All keymaps")
 
 -- org: capture is <leader>oc and agenda <leader>oa (nvim-orgmode defaults).
 -- <leader>ocj goes straight to a journal entry without the template menu.
-map("<leader>ofj", "<cmd>edit ~/orgfiles/journal.org<cr>", "Journal")
+-- tiller keeps the journal as one file per day under ~/orgfiles/journal, so
+-- "the journal" means today's file; it is created with its title line when
+-- missing, the same shape tiller writes.
+local function journal_today()
+  local path = vim.fn.expand("~/orgfiles/journal/") .. os.date("%Y-%m-%d") .. ".org"
+  if vim.fn.filereadable(path) == 0 then
+    vim.fn.mkdir(vim.fn.fnamemodify(path, ":h"), "p")
+    vim.fn.writefile({ "#+TITLE: " .. os.date("%Y-%m-%d %A"), "" }, path)
+  end
+  return path
+end
+map("<leader>ofj", function() vim.cmd.edit(vim.fn.fnameescape(journal_today())) end, "Journal, today")
+map("<leader>ofg", "<cmd>edit ~/orgfiles/goals.org<cr>", "Goals")
+map("<leader>ofn", function() require("telescope.builtin").find_files({ cwd = vim.fn.expand("~/orgfiles/notes"), prompt_title = "notes" }) end, "Find a note")
+map("<leader>ofb", function() require("telescope.builtin").find_files({ cwd = vim.fn.expand("~/orgfiles/book"), prompt_title = "books" }) end, "Find a book file")
 map("<leader>oft", "<cmd>edit ~/orgfiles/todo.org<cr>", "Todo")
 map("<leader>ofs", "<cmd>edit ~/orgfiles/shell-in-c-12-weeks.org<cr>", "Shell in C plan")
 map("<leader>ofr", "<cmd>edit ~/orgfiles/refile.org<cr>", "Refile")
@@ -300,9 +363,9 @@ vim.keymap.set({ "n", "v" }, "<leader>oZ", function() tiller_note_from_text(true
 -- screen, which is a jarring change of context after writing the first half in
 -- a centred float.
 --
--- This is the real journal.org buffer in a float, not a copy: :w writes the
--- actual file and there is nothing to synchronise back, which also means it
--- cannot invent the kind of divergence Syncthing turns into a conflict file.
+-- This is the real daily file in a float, not a copy: :w writes the actual
+-- file and there is nothing to synchronise back, which also means it cannot
+-- invent the kind of divergence Syncthing turns into a conflict file.
 local function journal_float()
   -- The same arithmetic as orgmode's utils.open_float at the same scale, so
   -- this window and the capture window are the same size in the same place.
@@ -327,9 +390,10 @@ local function journal_float()
   -- so the key failed with a stack traceback instead of vim's own ATTENTION
   -- prompt, which is the thing that actually explains the situation and
   -- offers recovery. :edit keeps that handling, inside this window.
-  if not pcall(vim.cmd.edit, vim.fn.fnameescape(vim.fn.expand("~/orgfiles/journal.org"))) then
+  local today = journal_today()
+  if not pcall(vim.cmd.edit, vim.fn.fnameescape(today)) then
     pcall(vim.api.nvim_win_close, win, true)
-    vim.notify("journal: could not open ~/orgfiles/journal.org", vim.log.levels.ERROR)
+    vim.notify("journal: could not open " .. today, vim.log.levels.ERROR)
     return
   end
   local bufnr = vim.api.nvim_get_current_buf()
@@ -339,15 +403,8 @@ local function journal_float()
   -- which is the normal case here, the journal usually being open already.
   org_window_opts()
 
-  -- Land at the end of today's entry, which is where you left off. Today's
-  -- section runs to the next top-level heading, or to the end of the file.
-  vim.fn.cursor(1, 1)
-  if vim.fn.search("^\\* " .. os.date("%Y-%m-%d"), "cW") > 0 then
-    local nxt = vim.fn.search("^\\* ", "W")
-    vim.fn.cursor(nxt > 0 and nxt - 1 or vim.fn.line("$"), 1)
-  else
-    vim.cmd("normal! G")
-  end
+  -- The whole file is today, so the end of it is where you left off.
+  vim.cmd("normal! G")
   vim.cmd("normal! zz")
 
   -- <C-c> finishes, the same key that finalises a capture, so the two windows
@@ -360,7 +417,7 @@ local function journal_float()
     pcall(vim.api.nvim_win_close, win, false)
   end, { buffer = bufnr, desc = "Save and close the journal float" })
 
-  -- Buffer-local mappings outlive the window, and journal.org is a file you
+  -- Buffer-local mappings outlive the window, and the daily file is one you
   -- also open normally, where <C-c> meaning "write and close" would be a
   -- surprise. Drop it when the float goes.
   vim.api.nvim_create_autocmd("WinClosed", {
@@ -371,12 +428,12 @@ local function journal_float()
     end,
   })
 end
-map("<leader>oj", journal_float, "Journal float (continue today)")
+map("<leader>oj", journal_float, "Journal: continue today in a float")
 map("<Esc>", "<cmd>nohlsearch<cr>", "Clear search")
 
 -- Syncthing carries ~/orgfiles between the two machines, and it does not merge.
 -- When the same file changes in both places it keeps one copy and parks the
--- other as journal.sync-conflict-<date>.org, which is easy not to notice — one
+-- other as <name>.sync-conflict-<date>.org, which is easy not to notice — one
 -- sat here for two days holding an entry that existed nowhere else.
 --
 -- The usual way to cause that is to leave the journal open in nvim on one
