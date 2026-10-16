@@ -99,15 +99,18 @@ require("lazy").setup({
     -- no option for that timer, so its autocmds are removed after setup: the
     -- popup now stays until a key completes the mapping or <Esc> cancels.
     config = function(_, opts)
-      require("which-key").setup(opts)
-      -- which-key finishes its own setup on the scheduler, so the "wk"
-      -- group does not exist yet here. Clear once that has run, and again a
-      -- moment later in case the first pass was too early.
-      local function keep_open()
+      -- The timer is registered inside which-key.state.setup, which the
+      -- plugin runs later on its own schedule. Wrapping that function
+      -- removes the two autocmds the moment they are created, whenever that
+      -- turns out to be.
+      local state = require("which-key.state")
+      local state_setup = state.setup
+      state.setup = function(...)
+        local r = state_setup(...)
         pcall(vim.api.nvim_clear_autocmds, { group = "wk", event = { "FocusLost", "FocusGained" } })
+        return r
       end
-      vim.schedule(function() vim.schedule(keep_open) end)
-      vim.defer_fn(keep_open, 500)
+      require("which-key").setup(opts)
     end,
     opts = {
       -- Show the popup as soon as a prefix is pressed, not after a pause: it
