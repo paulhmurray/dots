@@ -93,11 +93,24 @@ require("lazy").setup({
       require("org-bullets").setup()
     end },
   { "folke/which-key.nvim", event = "VeryLazy",
+    -- which-key closes its popup five seconds after the terminal loses focus.
+    -- With focus following the mouse on Hyprland, letting the pointer drift
+    -- off the window is enough, which read as "a timer closes it". There is
+    -- no option for that timer, so its autocmds are removed after setup: the
+    -- popup now stays until a key completes the mapping or <Esc> cancels.
+    config = function(_, opts)
+      require("which-key").setup(opts)
+      pcall(vim.api.nvim_clear_autocmds, { group = "wk", event = { "FocusLost", "FocusGained" } })
+    end,
     opts = {
       -- Show the popup as soon as a prefix is pressed, not after a pause: it
-      -- is the menu, so there is nothing to wait for. It stays until a key
-      -- completes the mapping or <Esc> cancels. (timeoutlen stays 400 for jk.)
+      -- is the menu, so there is nothing to wait for. (timeoutlen stays 400
+      -- for jk.)
       delay = 0,
+      -- A taller panel at the bottom right, with the group's name as its
+      -- title, so you can see where you are in the tree.
+      preset = "helix",
+      win = { width = { min = 36, max = 80 }, height = { min = 4, max = 0.8 } },
       -- Every group has a title and every leaf a plain sentence. nvim-orgmode
       -- registers its mappings with terse "org ..." descriptions and never
       -- names the groups, so which-key showed "+7 keymaps"; the entries below
@@ -106,6 +119,16 @@ require("lazy").setup({
         { "<leader>f", group = "find" },
         { "<leader>c", group = "code" },
         { "<leader>r", group = "refactor" },
+
+        -- Neovim's built-in prefixes, which which-key only counted.
+        { "g", group = "go to / misc (g)" },
+        { "z", group = "folds, spelling, scrolling (z)" },
+        { "z=", desc = "Spelling suggestions for this word" },
+        { "zg", desc = "Spelling: add word to dictionary" },
+        { "zw", desc = "Spelling: mark word as wrong" },
+        { "zug", desc = "Spelling: undo add word" },
+        { "zuw", desc = "Spelling: undo mark wrong" },
+        { "]s", desc = "Next misspelled word" }, { "[s", desc = "Previous misspelled word" },
 
         -- Neovim's own bracket motions (:help [a and friends), which it
         -- registers without descriptions, so which-key showed "23 keymaps".
@@ -311,7 +334,10 @@ map("<leader>fm", "<cmd>Telescope man_pages<cr>", "Man pages")
 map("<leader>w", "<cmd>w<cr>", "Save")
 map("<leader>q", "<cmd>q<cr>", "Quit")
 map("<leader>e", "<cmd>Explore<cr>", "File explorer")
-map("<leader>?", "<cmd>WhichKey<cr>", "All keymaps")
+-- Search every keymap by what it does, not by key: type "spell" or "link"
+-- and press enter to run it. The which-key popup is for browsing a prefix;
+-- this is for when you cannot remember which prefix.
+map("<leader>?", "<cmd>Telescope keymaps<cr>", "Search keymaps by description")
 
 -- org: capture is <leader>oc and agenda <leader>oa (nvim-orgmode defaults).
 -- <leader>ocj goes straight to a journal entry without the template menu.
