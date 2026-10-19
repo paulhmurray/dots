@@ -19,3 +19,5 @@ libreoffice-fresh
 ttf-carlito
 ttf-liberation
 ttf-caladea
+udisks2
+udiskie
