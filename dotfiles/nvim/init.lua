@@ -305,6 +305,18 @@ local function org_window_opts()
   vim.opt_local.wrap = true
   vim.opt_local.linebreak = true    -- break between words, not mid-word
   vim.opt_local.breakindent = true  -- continuation lines keep the indent
+
+  -- Hard wrap at 79. With "t" in formatoptions, insert mode breaks the line
+  -- as you type past the column; gwap reflows a paragraph already written.
+  -- gw rather than gq: gq goes through nvim-orgmode's formatexpr, which
+  -- only splits long lines and never rejoins short ones. "n" with the list
+  -- pattern below keeps "- item" continuation lines indented under the item
+  -- instead of being joined into the next one; "1" avoids ending a line on
+  -- "a" or "I". No "a" (auto-reflow while typing): it would also reflow
+  -- property drawers and tables.
+  vim.opt_local.textwidth = 79
+  vim.opt_local.formatoptions = "tcqjn1"
+  vim.opt_local.formatlistpat = [[^\s*\(\d\+[.)]\|[-+*]\)\s\+]]
   vim.opt_local.number = false      -- line numbers earn nothing in prose
   vim.opt_local.relativenumber = false
 
