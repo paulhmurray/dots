@@ -17,6 +17,11 @@ o.splitright = true
 o.splitbelow = true
 o.completeopt = { "menu", "menuone", "noselect" }
 o.timeoutlen = 400
+-- 79 everywhere. Code filetypes drop "t" from formatoptions, so this only
+-- wraps comments there; prose filetypes (org, markdown) keep "t" and wrap
+-- as you type. Existing long lines are never touched by this alone: see
+-- <leader>ow for org.
+o.textwidth = 79
 
 -- lazy.nvim bootstrap
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -169,6 +174,7 @@ require("lazy").setup({
         { "<leader>oj", desc = "Journal: continue today in a float" },
         { "<leader>oo", desc = "Open link or date under cursor" },
         { "<leader>os", desc = "Spelling: toggle checking in this window" },
+  { "<leader>ow", desc = "Wrap: reflow every paragraph in this file at 79" },
         { "<leader>oz", desc = "Tiller: note from this word, stay here" },
         { "<leader>oZ", desc = "Tiller: note from this word, then open it" },
         { "<leader>ot", desc = "Set tags on this heading" },
@@ -378,7 +384,7 @@ document("n", {
   ["zug"] = "Spelling: undo adding this word",
   ["]s"] = "Spelling: next misspelled word",
   ["[s"] = "Spelling: previous misspelled word",
-  ["gqip"] = "Reflow this paragraph",
+  ["gwip"] = "Reflow this paragraph at textwidth",
   ["gw"] = "Reflow (motion), keep cursor",
   ["ga"] = "Show character code under cursor",
   ["g;"] = "Jump to last change",
@@ -389,6 +395,67 @@ map("<leader>os", function()
   vim.wo.spell = not vim.wo.spell
   vim.notify("spell " .. (vim.wo.spell and "on" or "off"))
 end, "Spelling: toggle checking in this window")
+
+-- Reflow every prose paragraph in an org buffer at textwidth. textwidth only
+-- acts while you type, so a file written before it was set keeps its long
+-- lines until something reflows them. gggwG is not that something: a headline
+-- followed directly by text would be joined into it, and so would the
+-- #+TITLE/#+BOOK lines. This walks the buffer collecting runs of prose and
+-- formats each run on its own, stopping at blank lines and at anything
+-- structural (headlines, keywords, comments, drawers, tables) and leaving
+-- #+BEGIN ... #+END blocks alone. Bullets inside a run start their own
+-- paragraph thanks to "n" in formatoptions. Afterwards any link the formatter
+-- split across two lines is joined back, even if that line ends up long:
+-- tiller reads links line by line, so a broken [[id:x][Some Title]] would
+-- drop out of the graph.
+local function org_reflow()
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local runs, start, in_block = {}, nil, false
+  local function close(i)
+    if start then table.insert(runs, { start, i }); start = nil end
+  end
+  for i, line in ipairs(lines) do
+    local l = line:lower()
+    if l:match("^%s*#%+begin") then close(i - 1); in_block = true
+    elseif l:match("^%s*#%+end") then in_block = false
+    elseif in_block then -- leave block contents alone
+    elseif line:match("^%s*$") or line:match("^%*+%s") or line:match("^%s*[#:|]") then
+      close(i - 1)
+    elseif not start then start = i end
+  end
+  close(#lines)
+
+  -- nvim-orgmode's indentexpr re-indents every line the formatter creates,
+  -- which flattens bullets to column 0 and drops the hanging indent under a
+  -- wrapped item. Off while formatting, back afterwards.
+  local view, indentexpr = vim.fn.winsaveview(), vim.bo.indentexpr
+  vim.bo.indentexpr = ""
+  for r = #runs, 1, -1 do -- bottom up, so earlier line numbers stay valid
+    local s, e = runs[r][1], runs[r][2]
+    local before = vim.api.nvim_buf_line_count(0)
+    vim.cmd(("silent keepjumps normal! %dGV%dGgw"):format(s, e))
+    e = e + vim.api.nvim_buf_line_count(0) - before
+    local i = s
+    while i < e do
+      local l = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
+      local opens = select(2, l:gsub("%[%[", ""))
+      local closes = select(2, l:gsub("%]%]", ""))
+      if opens > closes then
+        vim.cmd(("silent keepjumps %dnormal! J"):format(i)); e = e - 1
+      else i = i + 1 end
+    end
+  end
+  vim.bo.indentexpr = indentexpr
+  vim.fn.winrestview(view)
+  vim.notify(("reflowed %d paragraph%s"):format(#runs, #runs == 1 and "" or "s"))
+end
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "org",
+  callback = function(ev)
+    vim.keymap.set("n", "<leader>ow", org_reflow,
+      { buffer = ev.buf, desc = "Wrap: reflow every paragraph in this file at 79" })
+  end,
+})
 
 -- org: capture is <leader>oc and agenda <leader>oa (nvim-orgmode defaults).
 -- <leader>ocj goes straight to a journal entry without the template menu.
