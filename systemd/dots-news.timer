@@ -2,7 +2,9 @@
 Description=Refresh headlines every half hour
 
 [Timer]
-OnBootSec=3min
+# OnStartupSec, not OnBootSec: in a per-user manager boot is long before login,
+# and a monotonic timer whose moment has already passed is skipped, not fired.
+OnStartupSec=3min
 OnUnitActiveSec=30min
 Persistent=true
 

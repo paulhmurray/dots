@@ -2,7 +2,9 @@
 Description=Check the dots repo every half hour
 
 [Timer]
-OnBootSec=2min
+# OnStartupSec, not OnBootSec: in a per-user manager boot is long before login,
+# and a monotonic timer whose moment has already passed is skipped, not fired.
+OnStartupSec=2min
 OnUnitActiveSec=30min
 # Catch up after the machine has been asleep, which is the laptop's normal day.
 Persistent=true

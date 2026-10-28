@@ -2,7 +2,9 @@
 Description=Check unread mail every couple of minutes
 
 [Timer]
-OnBootSec=1min
+# OnStartupSec, not OnBootSec: in a per-user manager boot is long before login,
+# and a monotonic timer whose moment has already passed is skipped, not fired.
+OnStartupSec=1min
 OnUnitActiveSec=2min
 Persistent=true
 
