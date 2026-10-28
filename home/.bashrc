@@ -36,7 +36,7 @@ done
 export PATH
 
 command -v starship >/dev/null && eval "$(starship init bash)"
-command -v zoxide   >/dev/null && eval "$(zoxide init bash)"
+command -v zoxide   >/dev/null && eval "$(zoxide init bash --cmd cd)"
 
 # machine-local and untracked: anything naming hosts, IPs or secrets
 [ -f "$HOME/.bashrc.local" ] && . "$HOME/.bashrc.local"
