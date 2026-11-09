@@ -40,3 +40,7 @@ command -v zoxide   >/dev/null && eval "$(zoxide init bash --cmd cd)"
 
 # machine-local and untracked: anything naming hosts, IPs or secrets
 [ -f "$HOME/.bashrc.local" ] && . "$HOME/.bashrc.local"
+
+# Added by flyctl installer
+export FLYCTL_INSTALL="/home/paulm/.fly"
+export PATH="$FLYCTL_INSTALL/bin:$PATH"
