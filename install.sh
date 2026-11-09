@@ -135,10 +135,10 @@ else
 fi
 
 echo "==> Desktop entries"
-# Overrides for launcher entries, e.g. routing Thunderbird through `mail show`
+# Overrides for launcher entries, e.g. routing Relay through `mail show`
 # so picking it from the launcher brings the scratchpad into view instead of
 # opening a window you cannot see. The filename must match the one the package
-# ships (org.mozilla.Thunderbird.desktop, not thunderbird.desktop) or it adds a
+# ships or exports (app.relay.Relay.desktop for the Flatpak) or it adds a
 # second entry beside it rather than replacing it.
 if [ -d "$DOTS/desktop" ]; then
     mkdir -p "$HOME/.local/share/applications"

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Relay
+GenericName=Email
+Comment=Mail and calendar on the scratchpad — Super+E toggles it
+Exec=mail show %u
+Icon=app.relay.Relay
+Terminal=false
+Categories=Office;Email;Calendar;
+MimeType=x-scheme-handler/mailto;
+Keywords=mail;email;imap;calendar;caldav;
+StartupWMClass=app.relay.Relay
+StartupNotify=false

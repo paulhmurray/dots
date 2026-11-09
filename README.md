@@ -40,19 +40,22 @@ should hold credentials that reach anything else.
 
 ## Mail
 
-Thunderbird on the `special:mail` scratchpad — `Super+E` shows and hides it, so
-it runs in the background and never takes a workspace. Its own notifications are
-off; the bar's envelope carries an unread count instead, and nothing else
-interrupts.
+Relay, the Flatpak `app.relay.Relay`, on the `special:mail` scratchpad —
+`Super+E` shows and hides it, so it runs in the background and never takes a
+workspace. Relay only syncs, notifies and fires reminders while its window
+exists and has no tray icon, so `mail ensure` starts it hidden at login. Its
+notifications are silenced in mako, reminders included; the bar's envelope
+carries an unread count instead, and nothing else interrupts.
 
-`theme/apply.sh` writes `userChrome.css` into the Thunderbird profile, so the
-mail client follows the machine's theme like everything else. It needs a
-Thunderbird restart to take effect.
+`mail show` is what the launcher entry and `mailto:` links run: it brings the
+scratchpad into view and hands the link to the running window. Relay is not in
+any Flatpak remote, so a new machine installs it by hand before this works;
+`install.sh` cannot.
 
 The unread count comes from `bin/mail-count`, which reads IMAP directly with its
-own app password rather than asking Thunderbird — so it is right whether
-Thunderbird is running or not, and a Thunderbird upgrade cannot break it. Run
-`mail setup` once to create the credential file.
+own app password rather than asking Relay — so it is right whether Relay is
+running or not, and a Relay upgrade cannot break it. Run `mail setup` once to
+create the credential file.
 
 ## Wallpapers
 

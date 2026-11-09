@@ -1,26 +1,61 @@
 #!/usr/bin/env bash
 # Show and hide the mail client, and keep the unread count fresh.
 #
-# Thunderbird lives on the special:mail scratchpad, so it runs in the
-# background and never takes one of the numbered workspaces. Same shape as
-# bin/music, for the same reasons.
+# Relay (the Flatpak app.relay.Relay) lives on the special:mail scratchpad, so
+# it runs in the background and never takes one of the numbered workspaces.
+# Same shape as bin/music, for the same reasons. It has no tray icon and only
+# syncs, notifies and fires reminders while its window exists, which is why
+# hyprland.conf runs `mail ensure` at login.
 set -euo pipefail
 
-CLASS='^(org\.mozilla\.Thunderbird)$'
+APP='app.relay.Relay'
+CLASS='^(app\.relay\.Relay)$'
 DOTS="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/dots/mail-account"
 
-running() { pgrep -x thunderbird >/dev/null 2>&1; }
+running() { flatpak ps --columns=application 2>/dev/null | grep -qx "$APP"; }
 
+# Start Relay if it is not running. Any arguments (a mailto: URL) go to the
+# new instance; when it is already running, `forward` hands them to it instead.
 ensure() {
     running && return 0
-    setsid thunderbird >/dev/null 2>&1 &
+    setsid flatpak run "$APP" "$@" >/dev/null 2>&1 &
     for _ in $(seq 1 40); do
         sleep 0.5
         running && return 0
     done
-    echo "mail: thunderbird did not start" >&2
+    echo "mail: relay did not start" >&2
     return 1
+}
+
+# Relay is single-instance: a second `flatpak run` with a URL passes it to the
+# running window and exits.
+forward() { [ $# -gt 0 ] && flatpak run "$APP" "$@" >/dev/null 2>&1 || true; }
+
+# Relay's window address, empty until the window exists. ensure only waits for
+# the process, so callers that need the window poll this briefly.
+addr() { hyprctl clients -j 2>/dev/null | jq -r 'first(.[] | select(.class == "app.relay.Relay")) | .address // empty'; }
+wait_addr() {
+    local a
+    for _ in $(seq 1 40); do
+        a=$(addr); [ -n "$a" ] && { echo "$a"; return 0; }
+        sleep 0.25
+    done
+    return 1
+}
+ws_of() { hyprctl clients -j 2>/dev/null | jq -r --arg a "$1" '.[] | select(.address == $a) | .workspace.name'; }
+
+# Put the window back on the scratchpad the way the window rule first placed
+# it. Needed after `pane` has pulled it out: the rule only runs when a window
+# opens, so moving it back by hand has to redo the float and size as well.
+park() {
+    local a=$1
+    [ "$(ws_of "$a")" = "special:mail" ] && return 0
+    hyprctl dispatch movetoworkspacesilent "special:mail,address:$a" >/dev/null 2>&1 || true
+    hyprctl dispatch setfloating "address:$a" >/dev/null 2>&1 || true
+    hyprctl dispatch resizewindowpixel "exact 1400 900,address:$a" >/dev/null 2>&1 || true
+    read -r mw mh < <(hyprctl monitors -j | jq -r 'first(.[] | select(.focused)) | "\(.width/.scale|floor) \(.height/.scale|floor)"')
+    hyprctl dispatch movewindowpixel "exact $(( (mw-1400)/2 )) $(( (mh-900)/2 )),address:$a" >/dev/null 2>&1 || true
 }
 
 case "${1:-}" in
@@ -29,11 +64,14 @@ case "${1:-}" in
     # Show or hide it over whatever you are doing. The window rule opens it
     # silently, so this is the only thing that ever brings it into view.
     # Always bring it into view, never hide it. This is what the launcher and
-    # the desktop entry use: picking Thunderbird from a launcher must show it,
-    # whereas Super+E toggles.
+    # the desktop entry use: picking Relay from a launcher, or clicking a
+    # mailto: link, must show it, whereas Super+E toggles. A URL argument is
+    # passed on so the compose window opens for the link that was clicked.
     show)
-        ensure
+        shift
+        if running; then forward "$@"; else ensure "$@"; fi
         if command -v hyprctl >/dev/null; then
+            a=$(wait_addr || true); [ -n "$a" ] && park "$a"
             shown=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].specialWorkspace.name // ""')
             [ "$shown" = "special:mail" ] || hyprctl dispatch togglespecialworkspace mail >/dev/null 2>&1 || true
             hyprctl dispatch focuswindow "class:$CLASS" >/dev/null 2>&1 || true
@@ -43,73 +81,29 @@ case "${1:-}" in
     window)
         ensure
         if command -v hyprctl >/dev/null; then
+            a=$(wait_addr || true); [ -n "$a" ] && park "$a"
             hyprctl dispatch togglespecialworkspace mail >/dev/null 2>&1 || true
         fi
         ;;
 
+    # Relay as an ordinary tile on the current workspace, for when there is
+    # more to do than delete one message. Super+E puts it back on the
+    # scratchpad; this is Super+Shift+E. Already a tile somewhere: go to it.
+    pane)
+        ensure
+        command -v hyprctl >/dev/null || exit 0
+        a=$(wait_addr) || { echo "mail: no relay window" >&2; exit 1; }
+        if [ "$(ws_of "$a")" = "special:mail" ]; then
+            shown=$(hyprctl monitors -j 2>/dev/null | jq -r 'first(.[] | select(.focused)) | .specialWorkspace.name // ""')
+            [ "$shown" = "special:mail" ] && hyprctl dispatch togglespecialworkspace mail >/dev/null 2>&1
+            ws=$(hyprctl activeworkspace -j | jq -r .id)
+            hyprctl dispatch movetoworkspacesilent "$ws,address:$a" >/dev/null 2>&1 || true
+            hyprctl dispatch settiled "address:$a" >/dev/null 2>&1 || true
+        fi
+        hyprctl dispatch focuswindow "address:$a" >/dev/null 2>&1 || true
+        ;;
+
     count)  "$DOTS/bin/mail-count" ;;
-
-    # Where Thunderbird keeps its profile. The directory name is random, and
-    # Thunderbird 155 moved it from ~/.thunderbird to ~/.config/thunderbird, so
-    # theme/apply.sh asks rather than guesses. The profile an install actually
-    # uses is the one its [Install...] section names, which is not necessarily
-    # the one flagged Default=1.
-    profile)
-        python3 - <<'PYEOF'
-import configparser, os, sys
-base = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "thunderbird")
-ini = os.path.join(base, "profiles.ini")
-if not os.path.exists(ini):
-    sys.exit(1)
-c = configparser.ConfigParser()
-c.read(ini)
-chosen = None
-for s in c.sections():                       # the install's own default
-    if s.startswith("Install") and c.has_option(s, "Default"):
-        chosen = c.get(s, "Default"); break
-if not chosen:                               # else whatever claims Default=1
-    for s in c.sections():
-        if c.has_option(s, "Default") and c.get(s, "Default") == "1" and c.has_option(s, "Path"):
-            chosen = c.get(s, "Path"); break
-if not chosen:                               # else the only one there is
-    paths = [c.get(s, "Path") for s in c.sections() if c.has_option(s, "Path")]
-    if len(paths) == 1:
-        chosen = paths[0]
-if not chosen:
-    sys.exit(1)
-print(os.path.join(base, chosen))
-PYEOF
-        ;;
-
-    # Preferences this setup depends on. Idempotent: each is appended only if
-    # absent, so hand edits elsewhere in user.js survive.
-    prefs)
-        prof=$("$0" profile 2>/dev/null || true)
-        [ -n "$prof" ] && [ -d "$prof" ] || { echo "mail: no Thunderbird profile yet" >&2; exit 1; }
-        js="$prof/user.js"; touch "$js"
-        add() { grep -qF "$1" "$js" || printf 'user_pref("%s", %s);\n' "$1" "$2" >> "$js"; }
-        # userChrome.css does nothing without this.
-        add "toolkit.legacyUserProfileCustomizations.stylesheets" true
-        # Dark chrome, so Thunderbird is internally consistent before any
-        # tinting. Painting individual containers over the light theme is what
-        # produced dark-on-dark text and a dark folder pane beside light panes.
-        add "ui.systemUsesDarkTheme" 1
-        # No popups and no sound: the bar's unread count is the only notice
-        # wanted, and a toast on every message is the thing being avoided.
-        add "mail.biff.show_alert"           false
-        add "mail.biff.play_sound"           false
-        add "mail.biff.show_tray_icon"       false
-        add "mail.biff.use_system_alert"     false
-        add "mail.biff.alert.show_preview"   false
-        add "mail.biff.alert.show_subject"   false
-        add "mail.biff.alert.show_sender"    false
-        add "mail.biff.animate_dock_icon"    false
-        # Calendar is part of Thunderbird, and its alarms are a separate popup.
-        add "calendar.alarms.show"           false
-        add "calendar.alarms.showmissed"     false
-        add "calendar.alarms.playsound"      false
-        echo "wrote $js"
-        ;;
 
     # One-time setup. Printed rather than automated: the app password has to be
     # created in a browser, and this file is the one thing here holding a
@@ -148,9 +142,9 @@ Now:
   3. Put your address and that app password into the file above.
   4. Check it with:  mail count
 
-This is separate from the OAuth login Thunderbird uses. It exists so the
-unread count works even when Thunderbird is closed, and so a Thunderbird
-upgrade cannot break it.
+This is separate from the Google sign-in Relay keeps in the keyring. It exists
+so the unread count works even when Relay is closed, and so a Relay upgrade
+cannot break it.
 EOF
         ;;
 
@@ -159,12 +153,11 @@ EOF
 usage: mail <command>
 
   window     show/hide the mail window over your work
-  show       bring it into view (never hides) — used by the launcher
-  ensure     start Thunderbird if it is not running
+  pane       pull it onto this workspace as an ordinary tile (Super+E puts it back)
+  show [url] bring it into view (never hides) — used by the launcher and mailto:
+  ensure     start Relay if it is not running
   count      check unread now and update the bar
   setup      create the credentials file and explain the app password
-  profile    print Thunderbird's profile directory
-  prefs      apply the prefs this setup needs (no popups, custom CSS on)
 EOF
         exit 2 ;;
 esac

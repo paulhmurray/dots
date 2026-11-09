@@ -6,9 +6,9 @@ import QtQuick
 
 // Unread count for the bar, written by the dots-mail timer.
 //
-// Nothing here talks to Thunderbird. bin/mail-count reads the IMAP folder
+// Nothing here talks to Relay. bin/mail-count reads the IMAP folder
 // status with its own credential, so the number is right whether the mail
-// client is running or not, and stays right across Thunderbird upgrades.
+// client is running or not, and stays right across Relay upgrades.
 Singleton {
     id: root
 

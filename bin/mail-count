@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Count unread mail over IMAP and write it where the bar can read it.
 
-Deliberately independent of Thunderbird: its own credentials, its own
+Deliberately independent of Relay, the mail client: its own credentials, its own
 connection, so the count is right whether or not the mail client is running,
-and a Thunderbird upgrade cannot change the format underneath it.
+and a Relay upgrade cannot change the format underneath it.
 
 Credentials live in ~/.config/dots/mail-account, mode 0600, never in the repo.
 One section per account:
