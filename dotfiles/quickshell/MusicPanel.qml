@@ -177,7 +177,7 @@ PanelWindow {
                 Text {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "enter play    ·    esc close    ·    shuffling continues from your pick"
+                    text: "enter play    ·    esc close    ·    plays on through the album, then shuffles"
                     color: Colours.dim
                     font.family: Colours.font
                     font.pixelSize: 11

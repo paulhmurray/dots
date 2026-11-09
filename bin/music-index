@@ -31,6 +31,24 @@ def first(tags, *keys):
     return ""
 
 
+def number(tags, key, name):
+    """Track or disc number as an int, 0 when there is none.
+
+    Tags come as "4", "04" or "4/13". Rips with no tag usually still carry the
+    number in the filename ("13.Actium.mp3"), so that is the fallback.
+    """
+    raw = first(tags, key).split("/")[0].strip()
+    if raw.isdigit():
+        return int(raw)
+    lead = ""
+    for ch in name:
+        if ch.isdigit():
+            lead += ch
+        else:
+            break
+    return int(lead) if lead else 0
+
+
 def main():
     if not os.path.isdir(MUSIC):
         sys.exit(f"music-index: no such directory: {MUSIC}")
@@ -56,6 +74,8 @@ def main():
                     "t": title,
                     "a": first(tags, "artist", "albumartist"),
                     "b": first(tags, "album"),
+                    "d": number(tags, "discnumber", ""),
+                    "n": number(tags, "tracknumber", name),
                     # Pre-lowered haystack: the panel filters on every keystroke
                     # over a few thousand rows, and doing it here means QML never
                     # lowercases the same strings again.
@@ -67,7 +87,10 @@ def main():
 
     # Untagged files last. Sorting by artist alone puts everything with no
     # artist tag at the very top, which is the first thing the panel shows.
-    tracks.sort(key=lambda t: (t["a"] == "", t["a"].lower(), t["b"].lower(), t["t"].lower()))
+    # Within an album the order is disc then track number, so an album's tracks
+    # sit together and in playing order: the panel lists them that way, and the
+    # bar plays on through an album by walking forward from the pick.
+    tracks.sort(key=lambda t: (t["a"] == "", t["a"].lower(), t["b"].lower(), t["d"], t["n"], t["t"].lower()))
     os.makedirs(CACHE, exist_ok=True)
     tmp = OUT + ".tmp"
     with open(tmp, "w") as f:

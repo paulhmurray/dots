@@ -11,6 +11,9 @@ import QtQuick
 // told "play my library". OpenUri plays one file immediately and appends it to
 // Tauon's playlist; there is no way to enqueue without playing. So the order
 // lives here: we play one track, and hand over the next when this one ends.
+//
+// Two orders: a shuffle of the whole library, and "the rest of this album"
+// after a pick from the search panel. The album runs out into the shuffle.
 Singleton {
     id: root
 
@@ -18,7 +21,9 @@ Singleton {
     property bool ready: false
     property var  order: []           // shuffled indices into tracks
     property int  cursor: -1
-    property bool shuffling: false    // are we driving playback?
+    property bool driving: false      // are we handing over the next track?
+    property bool albumMode: false    // walking an album rather than the shuffle
+    property int  albumCursor: -1     // index into tracks of the album track playing
 
     readonly property var player:
         Mpris.players.values.find(p => (p.dbusName ?? "").indexOf("tauon") !== -1) ?? null
@@ -70,21 +75,42 @@ Singleton {
         }
         order = idx;
         cursor = 0;
-        shuffling = true;
+        albumMode = false;
+        driving = true;
         playIndex(order[0]);
     }
 
-    // Jumping to a searched track keeps the shuffle running from there, so the
-    // panel does not end your listening session.
+    // music-index sorts the library artist, album, disc, track, so an album's
+    // tracks are contiguous and in playing order: "the rest of the album" is
+    // the run of same-artist, same-album rows after i. Untagged albums do not
+    // chain — an empty album name would string together everything untagged.
+    function sameAlbum(i, j) {
+        if (j < 0 || j >= tracks.length) return false;
+        const a = tracks[i], b = tracks[j];
+        return a.b !== "" && a.b === b.b && a.a === b.a;
+    }
+
+    // A pick from the panel plays that track, then the rest of its album in
+    // order. When the album ends the shuffle takes over, so the panel never
+    // ends your listening session.
     function playTrackAndContinue(i) {
         if (!ready) return;
-        if (order.length === 0) shuffleAll();
-        shuffling = true;
+        albumMode = true;
+        albumCursor = i;
+        driving = true;
         playIndex(i);
     }
 
     function nextTrack() {
-        if (!shuffling || order.length === 0) { shuffleAll(); return; }
+        if (albumMode) {
+            if (sameAlbum(albumCursor, albumCursor + 1)) {
+                albumCursor += 1;
+                playIndex(albumCursor);
+                return;
+            }
+            albumMode = false;             // album done: fall through to shuffle
+        }
+        if (!driving || order.length === 0) { shuffleAll(); return; }
         cursor = (cursor + 1) % order.length;
         playIndex(order[cursor]);
     }
@@ -110,7 +136,7 @@ Singleton {
         id: watch
         interval: 2000
         repeat: true
-        running: root.shuffling && root.playing
+        running: root.driving && root.playing
         onTriggered: {
             const p = root.player;
             if (!p || !p.isPlaying || !(p.length > 0)) return;
@@ -131,7 +157,7 @@ Singleton {
         target: root.player
         function onIsPlayingChanged() {
             if (root.player && root.player.playbackState === MprisPlaybackState.Stopped)
-                root.shuffling = false;
+                root.driving = false;
         }
     }
 }
