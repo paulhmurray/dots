@@ -20,3 +20,5 @@ ttf-liberation
 ttf-caladea
 udisks2
 udiskie
+gnome-keyring
+flatpak

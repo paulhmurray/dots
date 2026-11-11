@@ -1,2 +1,3 @@
 cuda docker docker-buildx docker-compose jdk17-openjdk nodejs npm
 ddcutil wl-clip-persist
+solaar
