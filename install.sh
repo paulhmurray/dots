@@ -183,6 +183,8 @@ done
 systemctl --user daemon-reload
 systemctl --user enable --now dots-status.timer dots-pacman.path dots-mail.timer dots-news.timer
 echo "    dots-status.timer, dots-pacman.path, dots-mail.timer, dots-news.timer"
+# The music engine. Package units, not ours: dots only supplies mpd.conf.
+systemctl --user enable --now mpd.service mpd-mpris.service || echo "    mpd not installed yet — skipping"
 
 echo "==> System scripts"
 # Each on its own. These enable services and set default applications, so a
