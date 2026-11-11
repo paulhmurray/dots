@@ -1,8 +1,6 @@
 -- Hyprland configuration. Lua, because Hyprland 0.57 dropped the hyprlang
 -- format that hyprland.conf was written in: a 0.57 login ignores that file,
 -- logs "No config file found" and writes a stock example here instead.
--- hyprland.conf stays beside this only until both machines have logged in on
--- 0.57, so a 0.56 session that reloads mid-transition still has its config.
 --
 -- Three machine-specific modules are loaded first, in the order the old
 -- `source` lines used. Each is optional: a fresh machine without a hosts/

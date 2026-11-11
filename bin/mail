@@ -5,7 +5,7 @@
 # it runs in the background and never takes one of the numbered workspaces.
 # Same shape as bin/music, for the same reasons. It has no tray icon and only
 # syncs, notifies and fires reminders while its window exists, which is why
-# hyprland.conf runs `mail ensure` at login.
+# hyprland.lua runs `mail ensure` at login.
 set -euo pipefail
 
 APP='app.relay.Relay'

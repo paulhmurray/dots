@@ -63,8 +63,6 @@ if [ -d "$DOTS/hosts/$HOST" ]; then
     # rather than aborting the run before anything is linked.
     [ -f "$DOTS/hosts/$HOST/packages.txt" ] && \
         install_list "$DOTS/hosts/$HOST/packages.txt"
-    [ -f "$DOTS/hosts/$HOST/hyprland.conf" ] && \
-        ln -sfn "$DOTS/hosts/$HOST/hyprland.conf" "$DOTS/dotfiles/hypr/host.conf"
     [ -f "$DOTS/hosts/$HOST/hyprland.lua" ] && \
         ln -sfn "$DOTS/hosts/$HOST/hyprland.lua" "$DOTS/dotfiles/hypr/host.lua"
     # Guarded: these enable services, and a unit that is not installed is a
@@ -78,7 +76,9 @@ if [ -d "$DOTS/hosts/$HOST" ]; then
     fi
 else
     echo "    no hosts/$HOST folder — using auto-detected defaults"
-    echo "monitor = , preferred, auto, 1" > "$DOTS/dotfiles/hypr/host.conf"
+    printf '%s\n' '-- Written by install.sh: no hosts/ folder for this machine.' \
+        'hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })' \
+        'return {}' > "$DOTS/dotfiles/hypr/host.lua"
     NO_HOST=1
 fi
 
@@ -199,7 +199,7 @@ echo "==> Verifying"
 for bin in Hyprland foot quickshell nvim; do
     command -v "$bin" >/dev/null || { echo "MISSING: $bin"; exit 1; }
 done
-for f in host.conf hardware.conf colours.conf host.lua hardware.lua colours.lua; do
+for f in host.lua hardware.lua colours.lua; do
     [ -f "$DOTS/dotfiles/hypr/$f" ] || { echo "MISSING: dotfiles/hypr/$f"; exit 1; }
 done
 # The generated set, none of it tracked: if apply.sh failed, say so here rather

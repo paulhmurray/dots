@@ -18,7 +18,6 @@ DOTS_SELF_WRITING=(
 # clear them before pulling. Without that, two machines on different themes can
 # never fast-forward: every one of these differs, permanently.
 DOTS_GENERATED=(
-    dotfiles/hypr/colours.conf
     dotfiles/hypr/colours.lua
     dotfiles/hypr/hyprlock.conf
     dotfiles/foot/foot.ini
