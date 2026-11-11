@@ -18,34 +18,37 @@ PanelWindow {
 
     property var binds: []
 
+    // The binds come from Hyprland itself rather than from the config text:
+    // the Lua config registers them with a description, and hyprctl reports
+    // them in registration order, so the list reads in the order the config
+    // is written. Only described binds are shown; an undescribed one is
+    // internal.
     Process {
         id: loader
-        command: ["sh", "-c", "grep -E '^bind[a-z]* *=' ~/.config/hypr/hyprland.conf"]
+        command: ["hyprctl", "-j", "binds"]
         stdout: StdioCollector {
             onStreamFinished: {
-                win.binds = text.trim().split("\n").map(line => {
-                    let [body, comment] = line.split("#");
-                    const rhs = body.substring(body.indexOf("=") + 1);
-                    const parts = rhs.split(",").map(s => s.trim());
-                    const mods = parts[0].replace("$mod", "Super").replace("SHIFT", "Shift")
-                        .replace("CTRL", "Ctrl").replace("ALT", "Alt").split(" ").filter(s => s);
-                    // Hyprland's key names are not what anyone calls these keys.
-                    const nicer = {
-                        RETURN: "Enter", SPACE: "Space", ESCAPE: "Esc", SLASH: "/",
-                        PRINT: "PrtSc", MonBrightnessUp: "Brightness up",
-                        MonBrightnessDown: "Brightness down",
-                        AudioRaiseVolume: "Volume up", AudioLowerVolume: "Volume down",
-                        AudioMute: "Mute", AudioPlay: "Play", AudioNext: "Next",
-                        AudioPrev: "Previous",
-                        "mouse:272": "Left-drag", "mouse:273": "Right-drag"
-                    };
-                    const raw = parts[1].replace("XF86", "");
-                    const key = nicer[raw] ?? raw.replace(/^([a-z])/, c => c.toUpperCase());
-                    const combo = [...mods, key].join(" + ");
-                    const desc = comment ? comment.trim()
-                        : parts[2] === "exec" ? parts.slice(3).join(",").replace("$term", "terminal")
-                        : parts.slice(2).join(" ");
-                    return { combo: combo, desc: desc };
+                let raw = [];
+                try { raw = JSON.parse(text); } catch (e) { console.log("Keybinds: bad json:", e); return; }
+
+                // Hyprland's key names are not what anyone calls these keys.
+                const nicer = {
+                    Return: "Enter", space: "Space", Escape: "Esc", slash: "/",
+                    Print: "PrtSc", MonBrightnessUp: "Brightness up",
+                    MonBrightnessDown: "Brightness down",
+                    AudioRaiseVolume: "Volume up", AudioLowerVolume: "Volume down",
+                    AudioMute: "Mute", AudioPlay: "Play", AudioNext: "Next",
+                    AudioPrev: "Previous",
+                    "mouse:272": "Left-drag", "mouse:273": "Right-drag"
+                };
+                // modmask bits, from Hyprland's keybind manager.
+                const modNames = [[64, "Super"], [1, "Shift"], [4, "Ctrl"], [8, "Alt"]];
+
+                win.binds = raw.filter(b => b.has_description).map(b => {
+                    const mods = modNames.filter(m => b.modmask & m[0]).map(m => m[1]);
+                    const rawKey = b.key.replace("XF86", "");
+                    const key = nicer[rawKey] ?? rawKey.replace(/^([a-z])$/, c => c.toUpperCase());
+                    return { combo: [...mods, key].join(" + "), desc: b.description };
                 });
 
                 // Collapse runs that differ only by a trailing number, so the

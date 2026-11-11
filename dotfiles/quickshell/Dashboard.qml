@@ -129,7 +129,7 @@ PanelWindow {
                     Repeater {
                         model: [
                             ["󰌾", "hyprlock"],
-                            ["󰍃", "hyprctl dispatch exit"],
+                            ["󰍃", "hyprctl dispatch 'hl.dsp.exit()'"],
                             ["󰤄", "systemctl suspend"],
                             ["󰜉", "systemctl reboot"],
                             ["󰐥", "systemctl poweroff"]

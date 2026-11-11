@@ -29,7 +29,7 @@ case "${1:-}" in
     window)
         ensure
         command -v hyprctl >/dev/null && \
-            hyprctl dispatch togglespecialworkspace news >/dev/null 2>&1 || true
+            hyprctl dispatch 'hl.dsp.workspace.toggle_special("news")' >/dev/null 2>&1 || true
         ;;
 
     # Always bring it into view — for the launcher, which must never hide.
@@ -37,7 +37,7 @@ case "${1:-}" in
         ensure
         if command -v hyprctl >/dev/null; then
             shown=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].specialWorkspace.name // ""')
-            [ "$shown" = "special:news" ] || hyprctl dispatch togglespecialworkspace news >/dev/null 2>&1 || true
+            [ "$shown" = "special:news" ] || hyprctl dispatch 'hl.dsp.workspace.toggle_special("news")' >/dev/null 2>&1 || true
         fi
         ;;
 
@@ -49,7 +49,7 @@ case "${1:-}" in
         if command -v hyprctl >/dev/null; then
             shown=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].specialWorkspace.name // ""')
             [ "$shown" = "special:news" ] && \
-                hyprctl dispatch togglespecialworkspace news >/dev/null 2>&1 || true
+                hyprctl dispatch 'hl.dsp.workspace.toggle_special("news")' >/dev/null 2>&1 || true
         fi
         setsid firefox "$@" >/dev/null 2>&1 &
         ;;

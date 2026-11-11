@@ -65,6 +65,8 @@ if [ -d "$DOTS/hosts/$HOST" ]; then
         install_list "$DOTS/hosts/$HOST/packages.txt"
     [ -f "$DOTS/hosts/$HOST/hyprland.conf" ] && \
         ln -sfn "$DOTS/hosts/$HOST/hyprland.conf" "$DOTS/dotfiles/hypr/host.conf"
+    [ -f "$DOTS/hosts/$HOST/hyprland.lua" ] && \
+        ln -sfn "$DOTS/hosts/$HOST/hyprland.lua" "$DOTS/dotfiles/hypr/host.lua"
     # Guarded: these enable services, and a unit that is not installed is a
     # normal outcome on a half-built machine. It is worth reporting, not worth
     # losing every symlink over — and this runs before all of them.
@@ -197,7 +199,7 @@ echo "==> Verifying"
 for bin in Hyprland foot quickshell nvim; do
     command -v "$bin" >/dev/null || { echo "MISSING: $bin"; exit 1; }
 done
-for f in host.conf hardware.conf colours.conf; do
+for f in host.conf hardware.conf colours.conf host.lua hardware.lua colours.lua; do
     [ -f "$DOTS/dotfiles/hypr/$f" ] || { echo "MISSING: dotfiles/hypr/$f"; exit 1; }
 done
 # The generated set, none of it tracked: if apply.sh failed, say so here rather
@@ -247,8 +249,8 @@ if [ -n "${NO_HOST:-}" ]; then
     regardless. To pin a monitor layout for this machine:
 
         mkdir -p "$DOTS/hosts/$HOST"
-        hyprctl monitors -j | jq -r '.[] | "monitor = \(.name), \(.width)x\(.height)@\(.refreshRate|floor), \(.x)x\(.y), 1"' \
-            > "$DOTS/hosts/$HOST/hyprland.conf"
+        hyprctl monitors -j | jq -r '.[] | "hl.monitor({ output = \"\(.name)\", mode = \"\(.width)x\(.height)@\(.refreshRate|floor)\", position = \"\(.x)x\(.y)\", scale = 1 })"' \
+            > "$DOTS/hosts/$HOST/hyprland.lua"
         ./install.sh
 EOF
 fi

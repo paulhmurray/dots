@@ -19,6 +19,7 @@ DOTS_SELF_WRITING=(
 # never fast-forward: every one of these differs, permanently.
 DOTS_GENERATED=(
     dotfiles/hypr/colours.conf
+    dotfiles/hypr/colours.lua
     dotfiles/hypr/hyprlock.conf
     dotfiles/foot/foot.ini
     dotfiles/quickshell/Colours.qml
