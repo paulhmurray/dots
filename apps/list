@@ -8,7 +8,10 @@
 #   name  kind     repo                asset          id               restart
 #
 # kind     flatpak: the release asset is a Flatpak bundle, installed --user.
-# id       the Flatpak application id, used to find what is installed and
+#          bundle: the asset is a .tar.gz of directories, each of which
+#          replaces ~/.local/share/<dir>, plus bin/, copied to ~/.local/bin.
+# id       flatpak: the Flatpak application id. bundle: the command in bin/,
+#          which is also the process name. Used to find what is installed and
 #          whether the running copy is older than it.
 # restart  the rest of the line: the command that restarts the app onto a new
 #          build. Printed, never run — killing a mail client mid-session is
@@ -18,3 +21,4 @@
 # README, "Your own apps").
 
 relay  flatpak  paulhmurray/relay  relay.flatpak  app.relay.Relay  flatpak kill app.relay.Relay && mail
+cadence  bundle   paulhmurray/cadence  cadence.tar.gz  cadence          pkill -x cadence; sleep 1; music ensure

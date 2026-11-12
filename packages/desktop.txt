@@ -3,7 +3,7 @@ fuzzel firefox
 hyprlock hypridle mako swaybg
 yazi bluez bluez-utils bluetui
 playerctl
-mpd mpc mpd-mpris
+mpd mpc mpd-mpris gtk3
 syncthing
 cava
 imv

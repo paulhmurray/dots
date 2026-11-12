@@ -207,6 +207,30 @@ apps_install_flatpak() {
     rm -rf "$tmp"; return 1
 }
 
+# A tarball of top-level dirs plus bin/: each dir replaces
+# ~/.local/share/<dir>, each file in bin/ goes to ~/.local/bin. Unpacked beside
+# the old copy first, so a failed download leaves the installed one alone.
+apps_install_bundle() {
+    local name="$1" repo="$2" asset="$3" tmp d f share="$HOME/.local/share"
+    tmp=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/dots-apps.XXXXXX") || return 1
+    if ! dots_gh release download --repo "$repo" --pattern "$asset" --dir "$tmp" --clobber \
+       || ! mkdir "$tmp/x" || ! tar -C "$tmp/x" -xzf "$tmp/$asset" \
+       || [ ! -d "$tmp/x/bin" ]; then
+        rm -rf "$tmp"; return 1
+    fi
+    mkdir -p "$share" "$HOME/.local/bin"
+    for d in "$tmp/x"/*/; do
+        d=$(basename "$d"); [ "$d" = bin ] && continue
+        rm -rf "$share/$d.new" && cp -r "$tmp/x/$d" "$share/$d.new" \
+            && rm -rf "$share/$d" && mv "$share/$d.new" "$share/$d" \
+            || { rm -rf "$tmp"; return 1; }
+    done
+    for f in "$tmp/x/bin"/*; do
+        install -m 755 "$f" "$HOME/.local/bin/$(basename "$f")" || { rm -rf "$tmp"; return 1; }
+    done
+    rm -rf "$tmp"
+}
+
 cmd_apps() {
     case "${1:-}" in
         token)
@@ -234,15 +258,16 @@ cmd_apps() {
     while read -r name kind repo asset id restart; do
         latest=$(awk -v n="$name" '$1 == n { print $2 }' "$DOTS_CACHE/apps-latest")
         have=$(dots_app_installed_tag "$name")
-        if [ "$kind" != flatpak ]; then
-            echo "    $name: unknown kind '$kind' in apps/list — skipped" >&2
-            failed=1; continue
-        fi
-        if flatpak info --user "$id" >/dev/null 2>&1 && [ "$have" = "$latest" ]; then
+        case "$kind" in
+            flatpak|bundle) ;;
+            *) echo "    $name: unknown kind '$kind' in apps/list — skipped" >&2
+               failed=1; continue ;;
+        esac
+        if dots_app_present "$kind" "$id" && [ "$have" = "$latest" ]; then
             echo "    $name  $latest"
             continue
         fi
-        if apps_install_flatpak "$name" "$repo" "$asset"; then
+        if "apps_install_$kind" "$name" "$repo" "$asset"; then
             printf '%s\n' "$latest" > "$DOTS_APPS_STATE/$name"
             echo "    $name  ${have:-new} → $latest"
         else

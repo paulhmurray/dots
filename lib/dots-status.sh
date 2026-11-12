@@ -156,6 +156,17 @@ dots_apps() {
     grep -vE '^[[:space:]]*(#|$)' "$DOTS/apps/list" 2>/dev/null || true
 }
 
+# Whether app $2 (its id) of kind $1 is installed here at all.
+#   flatpak  the Flatpak application id, installed --user
+#   bundle   the command the tarball's bin/ puts in ~/.local/bin
+dots_app_present() {
+    case "$1" in
+        flatpak) flatpak info --user "$2" >/dev/null 2>&1 ;;
+        bundle)  [ -x "$HOME/.local/bin/$2" ] ;;
+        *)       return 1 ;;
+    esac
+}
+
 # The release tag dots last installed here, or nothing.
 dots_app_installed_tag() {
     cat "$DOTS_APPS_STATE/$1" 2>/dev/null || true
@@ -169,7 +180,7 @@ dots_app_updates() {
     while read -r name kind repo asset id _; do
         latest=$(awk -v n="$name" '$1 == n { print $2 }' "$DOTS_CACHE/apps-latest" 2>/dev/null)
         [ -n "$latest" ] || continue
-        if ! flatpak info --user "$id" >/dev/null 2>&1; then
+        if ! dots_app_present "$kind" "$id"; then
             echo "$name (not installed)"
             continue
         fi
@@ -187,6 +198,17 @@ dots_app_updates() {
 dots_app_restart() {
     local name kind repo asset id _ running installed
     while read -r name kind repo asset id _; do
+        if [ "$kind" = bundle ]; then
+            # A bundle is replaced on disk, so a copy still running from the
+            # old one runs a deleted executable.
+            local pid
+            for pid in $(pgrep -x "$id" 2>/dev/null); do
+                case "$(readlink "/proc/$pid/exe" 2>/dev/null)" in
+                    *" (deleted)") echo "$name"; break ;;
+                esac
+            done
+            continue
+        fi
         running=$(flatpak ps --columns=application,commit 2>/dev/null \
                   | awk -v a="$id" '$1 == a { print $2; exit }')
         [ -n "$running" ] || continue

@@ -58,9 +58,10 @@ create the credential file.
 
 ## Your own apps
 
-Apps you build yourself — Relay now, Cadence next — are part of the machine,
+Apps you build yourself — Relay and Cadence — are part of the machine,
 not separate installs. Each is one line in `apps/list`: its private repo, the
-release asset, and how to install it. `dots apps` reads each repo's latest
+release asset, and how to install it (a Flatpak, or for Cadence a plain
+bundle tarball unpacked into ~/.local). `dots apps` reads each repo's latest
 GitHub release, compares it with the tag recorded in
 `~/.local/state/dots/apps/`, and downloads and installs only what is newer or
 missing. Every `dots sync` runs it, whether or not any dots file changed — a
