@@ -145,3 +145,63 @@ dots_dirty() {
 dots_theme() {
     cat "$HOME/.config/current-theme" 2>/dev/null || echo unknown
 }
+
+# --- your own apps ---------------------------------------------------------
+# Built in private repos and installed from their GitHub releases by
+# `dots apps`. See apps/list for the format.
+DOTS_APPS_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dots/apps"
+
+# "name kind repo asset id restart..." per app, comments and blanks dropped.
+dots_apps() {
+    grep -vE '^[[:space:]]*(#|$)' "$DOTS/apps/list" 2>/dev/null || true
+}
+
+# The release tag dots last installed here, or nothing.
+dots_app_installed_tag() {
+    cat "$DOTS_APPS_STATE/$1" 2>/dev/null || true
+}
+
+# Apps with a newer release than the one installed here, or not installed at
+# all. Reads the latest tags `dots status --fetch` left in the cache, so it
+# never touches the network itself.
+dots_app_updates() {
+    local name kind repo asset id _ latest have
+    while read -r name kind repo asset id _; do
+        latest=$(awk -v n="$name" '$1 == n { print $2 }' "$DOTS_CACHE/apps-latest" 2>/dev/null)
+        [ -n "$latest" ] || continue
+        if ! flatpak info --user "$id" >/dev/null 2>&1; then
+            echo "$name (not installed)"
+            continue
+        fi
+        have=$(dots_app_installed_tag "$name")
+        [ "$have" = "$latest" ] || echo "$name ${have:-unknown} → $latest"
+    done < <(dots_apps)
+    return 0
+}
+
+# Apps whose running copy is older than the installed one: updated underneath
+# a window that is still open. Asked of flatpak rather than remembered, like
+# the reboot check — it clears itself the moment the app is restarted, and it
+# also catches an update installed by hand. `flatpak ps` gives a 12-character
+# prefix of the commit the instance started from.
+dots_app_restart() {
+    local name kind repo asset id _ running installed
+    while read -r name kind repo asset id _; do
+        running=$(flatpak ps --columns=application,commit 2>/dev/null \
+                  | awk -v a="$id" '$1 == a { print $2; exit }')
+        [ -n "$running" ] || continue
+        installed=$(flatpak info --user --show-commit "$id" 2>/dev/null || true)
+        [ -n "$installed" ] || continue
+        case "$installed" in
+            "$running"*) ;;
+            *) echo "$name" ;;
+        esac
+    done < <(dots_apps)
+    return 0
+}
+
+# Why the last release check could not run (no GitHub login, offline), or
+# nothing. Written by the fetch, so a stale reason clears on the next success.
+dots_apps_error() {
+    cat "$DOTS_CACHE/apps-error" 2>/dev/null || true
+}

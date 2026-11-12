@@ -17,7 +17,9 @@ usage: dots <command>
   status --json    the same, as JSON
   status --write   write the JSON to ~/.cache/dots/status.json
 
-  sync             pull, then do only what the changed files require
+  sync             pull, do only what the changed files require, then apps
+  apps             install or update your own apps from their releases
+  apps token       save the read-only GitHub token apps needs (one time)
   add <pkg>        upgrade, install, record in a list, commit and push
   upgrade          yay -Syu, then say whether a reboot is needed
   auth             set this machine up to push (one time, needs a token)
@@ -120,6 +122,147 @@ cmd_auth() {
     fi
 }
 
+# --- apps ------------------------------------------------------------------
+# Your own apps, from GitHub releases in private repos (apps/list). Reading a
+# private release needs a credential, unlike everything else here. A token in
+# ~/.config/dots/github-token wins; otherwise gh's own login, which the machine
+# you develop on already has.
+DOTS_GH_TOKEN="${XDG_CONFIG_HOME:-$HOME/.config}/dots/github-token"
+
+apps_help() {
+    cat <<'EOF2'
+
+To let this machine install your own apps, once:
+
+  1. Create a token at https://github.com/settings/personal-access-tokens
+     Repository access: only  paulhmurray/relay  (and each app repo you add)
+     Permissions:       Contents -> Read-only
+
+  2. dots apps token        (paste it, then Ctrl-D)
+
+  3. dots apps
+
+Read-only and limited to the app repos: `gh auth login` would give this
+machine every private repo you have.
+EOF2
+}
+
+# gh, non-interactive and bounded. A captive portal swallows connections rather
+# than refusing them, and this runs inside sync and the status timer.
+dots_gh() {
+    local token=""
+    [ -r "$DOTS_GH_TOKEN" ] && token=$(tr -d '[:space:]' < "$DOTS_GH_TOKEN")
+    if [ -n "$token" ]; then
+        GH_TOKEN="$token" GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
+            GIT_TERMINAL_PROMPT=0 timeout 60 gh "$@"
+    else
+        GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
+            GIT_TERMINAL_PROMPT=0 timeout 60 gh "$@"
+    fi
+}
+
+# Ask GitHub for each app's latest release tag and cache the answers for
+# `dots status`. Prints the reason and returns 1 when it could not.
+apps_fetch_latest() {
+    local name kind repo asset id _ tag err="" out=""
+    mkdir -p "$DOTS_CACHE"
+    if [ -z "$(dots_apps)" ]; then
+        : > "$DOTS_CACHE/apps-latest"; : > "$DOTS_CACHE/apps-error"; return 0
+    fi
+    if ! command -v gh >/dev/null; then
+        err="gh is not installed"
+    elif [ ! -r "$DOTS_GH_TOKEN" ] && ! dots_gh auth status >/dev/null 2>&1; then
+        err="no GitHub token for your app repos (dots apps)"
+    else
+        while read -r name kind repo asset id _; do
+            if tag=$(dots_gh release view --repo "$repo" --json tagName -q .tagName 2>/dev/null) \
+               && [ -n "$tag" ]; then
+                out+="$name $tag"$'\n'
+            else
+                err="could not read releases of $repo (offline, or the token cannot see it)"
+            fi
+        done < <(dots_apps)
+    fi
+    # Only overwrite good answers with good answers: offline should not make
+    # the bar forget that an update exists.
+    [ -n "$out" ] && printf '%s' "$out" > "$DOTS_CACHE/apps-latest"
+    printf '%s' "$err" > "$DOTS_CACHE/apps-error"
+    [ -z "$err" ] || { echo "    $err" >&2; return 1; }
+}
+
+apps_install_flatpak() {
+    local name="$1" repo="$2" asset="$3" tmp
+    if ! flatpak remotes --user --columns=name 2>/dev/null | grep -qx flathub; then
+        # The bundle's runtime comes from here on its first install.
+        flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo || return 1
+    fi
+    # Outside the repo, always: a bundle is not something to leave lying in a
+    # public git checkout.
+    tmp=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/dots-apps.XXXXXX") || return 1
+    if dots_gh release download --repo "$repo" --pattern "$asset" --dir "$tmp" --clobber \
+       && flatpak install --user -y --noninteractive --reinstall "$tmp/$asset"; then
+        rm -rf "$tmp"; return 0
+    fi
+    rm -rf "$tmp"; return 1
+}
+
+cmd_apps() {
+    case "${1:-}" in
+        token)
+            mkdir -p "$(dirname "$DOTS_GH_TOKEN")"
+            echo "Paste the token, then Ctrl-D:"
+            local t; t=$(cat | tr -d '[:space:]')
+            [ -n "$t" ] || { echo "Nothing pasted; left as it was." >&2; return 1; }
+            (umask 077 && printf '%s\n' "$t" > "$DOTS_GH_TOKEN")
+            echo "==> Saved to $DOTS_GH_TOKEN (readable only by you)"
+            return 0 ;;
+        "") ;;
+        *) echo "dots apps: unknown option $1" >&2; return 2 ;;
+    esac
+
+    echo "==> Your apps"
+    [ -n "$(dots_apps)" ] || { echo "    none listed in apps/list"; return 0; }
+    if ! apps_fetch_latest; then
+        apps_help >&2
+        refresh_status
+        return 1
+    fi
+
+    local name kind repo asset id restart latest have failed=0
+    mkdir -p "$DOTS_APPS_STATE"
+    while read -r name kind repo asset id restart; do
+        latest=$(awk -v n="$name" '$1 == n { print $2 }' "$DOTS_CACHE/apps-latest")
+        have=$(dots_app_installed_tag "$name")
+        if [ "$kind" != flatpak ]; then
+            echo "    $name: unknown kind '$kind' in apps/list — skipped" >&2
+            failed=1; continue
+        fi
+        if flatpak info --user "$id" >/dev/null 2>&1 && [ "$have" = "$latest" ]; then
+            echo "    $name  $latest"
+            continue
+        fi
+        if apps_install_flatpak "$name" "$repo" "$asset"; then
+            printf '%s\n' "$latest" > "$DOTS_APPS_STATE/$name"
+            echo "    $name  ${have:-new} → $latest"
+        else
+            echo "    $name: install of $latest failed" >&2
+            failed=1
+        fi
+    done < <(dots_apps)
+
+    # Whatever installed the new build, an open window is still the old one.
+    local r
+    while read -r r; do
+        [ -n "$r" ] || continue
+        restart=$(dots_apps | awk -v n="$r" '$1 == n { $1=$2=$3=$4=$5=""; sub(/^ +/, ""); print }')
+        echo "    $r is running an older build — restart it when convenient: $restart"
+    done < <(dots_app_restart)
+
+    refresh_status
+    return "$failed"
+}
+
 # --- sync ------------------------------------------------------------------
 mark_applied() {
     mkdir -p "$(dirname "$APPLIED")" && echo "$1" > "$APPLIED"
@@ -216,8 +359,12 @@ cmd_sync() {
         # The theme files were just discarded; put them back before leaving.
         "$DOTS/theme/apply.sh" >/dev/null 2>&1 || true
         mark_applied "$after"
+        # Every sync, not only when files changed: a new app release changes
+        # nothing in this repo.
+        local apps_rc=0
+        cmd_apps || apps_rc=1
         refresh_status
-        return 0
+        return "$apps_rc"
     fi
 
     changed=$(git diff --name-only "$baseline" "$after")
@@ -281,8 +428,15 @@ cmd_sync() {
     fi
 
     mark_applied "$after"
+
+    # After mark_applied: the dots side is finished either way. A failure here
+    # still returns 1, so the terminal the bar opened stays up long enough to
+    # read why (no token, offline) instead of closing on a half-success.
+    local apps_rc=0
+    cmd_apps || apps_rc=1
     refresh_status
     echo "==> Done"
+    return "$apps_rc"
 }
 
 # --- add -------------------------------------------------------------------
@@ -438,6 +592,14 @@ cmd_status() {
     dirty=$(dots_dirty)
     reboot=$(dots_reboot_pending)
 
+    # Latest app releases ride on the same timer fetch, and stay quiet: the
+    # reason lands in status.json for the bar.
+    local app_updates app_restart apps_error
+    [ "$fetch" = 1 ] && { apps_fetch_latest >/dev/null 2>&1 || true; }
+    app_updates=$(dots_app_updates)
+    app_restart=$(dots_app_restart)
+    apps_error=$(dots_apps_error)
+
     if [ "$json" = 1 ] || [ "$write" = 1 ]; then
         local doc
         doc=$(jq -n \
@@ -449,14 +611,22 @@ cmd_status() {
             --argjson drift "$(printf '%s' "$drift" | jq -R -s 'split("\n") | map(select(length > 0))')" \
             --argjson aur_drift "$(printf '%s' "$aur_drift" | jq -R -s 'split("\n") | map(select(length > 0))')" \
             --argjson reboot "$(printf '%s' "$reboot" | jq -R -s 'split("\n") | map(select(length > 0))')" \
+            --argjson app_updates "$(printf '%s' "$app_updates" | jq -R -s 'split("\n") | map(select(length > 0))')" \
+            --argjson app_restart "$(printf '%s' "$app_restart" | jq -R -s 'split("\n") | map(select(length > 0))')" \
+            --arg     apps_error "$apps_error" \
             --arg     checked_at "$(date -Is)" \
             --argjson stale "$stale" \
             '{host: $host, theme: $theme, behind: $behind, ahead: $ahead,
               dirty: $dirty, drift: $drift, aur_drift: $aur_drift,
-              reboot: $reboot, checked_at: $checked_at, stale: $stale,
+              reboot: $reboot, app_updates: $app_updates,
+              app_restart: $app_restart, apps_error: $apps_error,
+              checked_at: $checked_at, stale: $stale,
               clean: (($behind + $ahead) == 0 and ($dirty | length) == 0
                       and ($drift | length) == 0 and ($aur_drift | length) == 0
-                      and ($reboot | length) == 0)}')
+                      and ($reboot | length) == 0
+                      and ($app_updates | length) == 0
+                      and ($app_restart | length) == 0
+                      and ($apps_error | length) == 0)}')
         if [ "$write" = 1 ]; then
             mkdir -p "$DOTS_CACHE"
             printf '%s\n' "$doc" > "$DOTS_CACHE/status.json"
@@ -476,12 +646,12 @@ cmd_status() {
     fi
     if [ -n "$drift" ]; then
         echo "drift     $(wc -l <<<"$drift") package(s) installed but in no list"
-        tr '\n' ' ' <<<"$drift" | fold -s -w 64 | sed 's/^/            /'
+        tr '\n' ' ' <<<"$drift" | fold -s -w 64 | sed 's/^/            /'; echo
         said=1
     fi
     if [ -n "$aur_drift" ]; then
         echo "aur       $(wc -l <<<"$aur_drift") AUR package(s) in no list"
-        tr '\n' ' ' <<<"$aur_drift" | fold -s -w 64 | sed 's/^/            /'
+        tr '\n' ' ' <<<"$aur_drift" | fold -s -w 64 | sed 's/^/            /'; echo
         said=1
     fi
     if [ -n "$reboot" ]; then
@@ -489,6 +659,16 @@ cmd_status() {
         sed 's/^/            /' <<<"$reboot"
         said=1
     fi
+    if [ -n "$app_updates" ]; then
+        echo "apps      new release(s) — dots apps"
+        sed 's/^/            /' <<<"$app_updates"
+        said=1
+    fi
+    if [ -n "$app_restart" ]; then
+        echo "restart   running an older build than is installed: $(tr '\n' ' ' <<<"$app_restart")"
+        said=1
+    fi
+    [ -n "$apps_error" ] && { echo "apps      $apps_error"; said=1; }
     [ "$said" = 0 ] && echo "up to date   ($(dots_host), theme $(dots_theme))"
     return 0
 }
@@ -499,6 +679,7 @@ case "${1:-}" in
     add)     shift; cmd_add "$@" ;;
     upgrade) shift; cmd_upgrade "$@" ;;
     auth)    shift; cmd_auth "$@" ;;
+    apps)    shift; cmd_apps "$@" ;;
     relink)  shift; echo "==> Relinking commands"; relink ;;
     -h|--help|help|"") usage ;;
     *) echo "dots: unknown command '$1'" >&2; usage >&2; exit 2 ;;

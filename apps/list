@@ -1,0 +1,20 @@
+# Paul's own apps: built in their own private repos, published as GitHub
+# releases, installed and kept current by `dots apps` (run by every
+# `dots sync` and by install.sh). Never put a build in this repo: it is public,
+# and a bundle can carry things like an OAuth client.
+#
+# One app per line, whitespace-separated:
+#
+#   name  kind     repo                asset          id               restart
+#
+# kind     flatpak: the release asset is a Flatpak bundle, installed --user.
+# id       the Flatpak application id, used to find what is installed and
+#          whether the running copy is older than it.
+# restart  the rest of the line: the command that restarts the app onto a new
+#          build. Printed, never run — killing a mail client mid-session is
+#          your call, not dots'.
+#
+# Adding an app is one line here, plus its repo on the read-only token (see
+# README, "Your own apps").
+
+relay  flatpak  paulhmurray/relay  relay.flatpak  app.relay.Relay  flatpak kill app.relay.Relay && mail

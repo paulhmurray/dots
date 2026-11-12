@@ -196,6 +196,12 @@ for s in "$DOTS"/scripts/*.sh; do
     "$s" || { echo "    $(basename "$s") failed — continuing"; SCRIPT_FAILED+=("$(basename "$s")"); }
 done
 
+echo "==> Apps"
+# Your own apps from their private releases (apps/list). By path, not by name:
+# on a fresh machine the ~/.local/bin link was made seconds ago and this shell
+# may not have it on PATH. Reported, not fatal — with no token yet it prints
+# what to do, and everything else here is still worth finishing.
+"$DOTS/bin/dots" apps || SCRIPT_FAILED+=("dots apps")
 
 echo "==> Verifying"
 for bin in Hyprland foot quickshell nvim; do

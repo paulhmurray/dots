@@ -234,6 +234,8 @@ PanelWindow {
                         Txt {
                             width: parent.width
                             visible: Sync.gitLines.length === 0 && Sync.reboot.length === 0
+                                     && Sync.appUpdates.length === 0
+                                     && Sync.appRestart.length === 0 && Sync.appsError === ""
                             text: "󰄬  " + (Sync.stale ? "up to date (check failed)" : "up to date")
                             color: Sync.stale ? Colours.dim : Colours.green
                         }
@@ -267,6 +269,39 @@ PanelWindow {
                                 width: parent.width
                                 wrapMode: Text.WordWrap
                                 text: Sync.reboot.join("  ")
+                                color: Colours.dim
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        // Your own apps: a release not yet installed, a window
+                        // still running the build before it, or why neither
+                        // could be checked. `dots sync` installs; restarting
+                        // stays your call.
+                        Column {
+                            width: parent.width
+                            spacing: 2
+                            visible: Sync.appUpdates.length > 0 || Sync.appRestart.length > 0
+                                     || Sync.appsError !== ""
+                            Txt {
+                                visible: Sync.appUpdates.length > 0
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                text: "󰏔  " + Sync.appUpdates.join("  ")
+                                color: Colours.accent
+                            }
+                            Txt {
+                                visible: Sync.appRestart.length > 0
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                text: "󰑓  restart " + Sync.appRestart.join(", ") + " for its new build"
+                                color: Colours.yellow
+                            }
+                            Txt {
+                                visible: Sync.appsError !== ""
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                text: "󰀦  " + Sync.appsError
                                 color: Colours.dim
                                 font.pixelSize: 11
                             }

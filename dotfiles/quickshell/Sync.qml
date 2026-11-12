@@ -16,6 +16,9 @@ Singleton {
     property var  drift: []
     property var  aurDrift: []
     property var  reboot: []
+    property var  appUpdates: []     // "relay v… → v…", from apps/list releases
+    property var  appRestart: []     // apps running an older build than installed
+    property string appsError: ""    // why releases could not be checked
     property bool stale: false
     property bool clean: true
     property string theme: ""
@@ -26,10 +29,12 @@ Singleton {
     // single action however many packages are behind it. Unlike available
     // updates — deliberately kept off the bar because Arch always has some —
     // this is rare and clears itself the moment you act on it, so a lit badge
-    // means something.
+    // means something. Your own apps count for the same reason: a release is
+    // something you published on purpose, and a restart notice clears itself.
     readonly property int count:
         behind + ahead + dirty + drift.length + aurDrift.length
         + (reboot.length > 0 ? 1 : 0)
+        + appUpdates.length + appRestart.length + (appsError !== "" ? 1 : 0)
 
     // Available updates, deliberately NOT part of status.json and never shown
     // on the bar: Arch always has updates, so an indicator driven by them is
@@ -88,6 +93,9 @@ Singleton {
         if (drift.length > 0)   bits.push("not in any list: " + drift.join(" "));
         if (aurDrift.length > 0) bits.push("AUR, not listed: " + aurDrift.join(" "));
         if (reboot.length > 0)  bits.push("reboot needed: " + reboot.join(", "));
+        if (appUpdates.length > 0) bits.push("app updates: " + appUpdates.join(", "));
+        if (appRestart.length > 0) bits.push("restart for new build: " + appRestart.join(", "));
+        if (appsError !== "")   bits.push("apps: " + appsError);
         if (stale)              bits.push("(last check could not reach GitHub)");
         return bits.length > 0 ? bits.join("\n") : "up to date";
     }
@@ -116,6 +124,9 @@ Singleton {
             root.drift    = d.drift ?? [];
             root.aurDrift = d.aur_drift ?? [];
             root.reboot   = d.reboot ?? [];
+            root.appUpdates = d.app_updates ?? [];
+            root.appRestart = d.app_restart ?? [];
+            root.appsError  = d.apps_error ?? "";
             root.stale    = d.stale ?? false;
             root.theme    = d.theme ?? "";
             root.clean    = d.clean ?? true;

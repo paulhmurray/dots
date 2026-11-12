@@ -48,14 +48,52 @@ notifications are silenced in mako, reminders included; the bar's envelope
 carries an unread count instead, and nothing else interrupts.
 
 `mail show` is what the launcher entry and `mailto:` links run: it brings the
-scratchpad into view and hands the link to the running window. Relay is not in
-any Flatpak remote, so a new machine installs it by hand before this works;
-`install.sh` cannot.
+scratchpad into view and hands the link to the running window. Relay itself is
+installed and kept current by `dots apps` — see below.
 
 The unread count comes from `bin/mail-count`, which reads IMAP directly with its
 own app password rather than asking Relay — so it is right whether Relay is
 running or not, and a Relay upgrade cannot break it. Run `mail setup` once to
 create the credential file.
+
+## Your own apps
+
+Apps you build yourself — Relay now, Cadence next — are part of the machine,
+not separate installs. Each is one line in `apps/list`: its private repo, the
+release asset, and how to install it. `dots apps` reads each repo's latest
+GitHub release, compares it with the tag recorded in
+`~/.local/state/dots/apps/`, and downloads and installs only what is newer or
+missing. Every `dots sync` runs it, whether or not any dots file changed — a
+new release changes nothing in this repo — and so does `install.sh`.
+
+Builds never go in this repo: it is public, and a bundle can carry an OAuth
+client. They live in the releases of each app's private repo (Relay publishes
+with `make release`). Nothing per machine is shared either: accounts, keyring
+entries and app data stay where they are, and each machine signs in once.
+
+Restarting is never automatic. An app updated while its window is open keeps
+running the old build; the bar counts that, the Dashboard names the app, and
+`dots apps` prints the restart command (for Relay,
+`flatpak kill app.relay.Relay && mail`). It clears itself once restarted.
+
+The status timer checks for new releases too, so the bar shows one before you
+sync.
+
+### A new machine
+
+Private releases need a credential. Give each machine a read-only token rather
+than `gh auth login`, which would hand it every private repo you have:
+
+1. https://github.com/settings/personal-access-tokens — Repository access:
+   only the app repos (`paulhmurray/relay`, …); Permissions: Contents →
+   Read-only.
+2. `dots apps token`, paste it, Ctrl-D. It is stored in
+   `~/.config/dots/github-token`, mode 600, never in this repo.
+3. `dots apps`.
+
+Until then `dots sync` says so and leaves its window open, rather than
+skipping your apps without a word. Adding an app later means adding its repo
+to the token as well as a line to `apps/list`.
 
 ## Wallpapers
 
