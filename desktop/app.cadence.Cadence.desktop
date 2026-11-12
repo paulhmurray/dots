@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Cadence
+GenericName=Music
+Comment=Music on the scratchpad — Super+M toggles it
+Exec=music show
+Icon=multimedia-audio-player
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=music;mpd;player;albums;playlist;
+StartupWMClass=app.cadence.Cadence
+StartupNotify=false

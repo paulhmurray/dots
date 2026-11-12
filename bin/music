@@ -1,87 +1,146 @@
 #!/usr/bin/env bash
-# Talks to Tauon over MPRIS for the bar's music controls.
+# Music: MPD plays, Cadence is the window.
 #
-# Everything D-Bus lives here rather than in QML, so it can be tested from a
-# terminal and so the bar never has to care whether Tauon is running. Tauon
-# exited twice unprompted while this was being built and the cause was never
-# reproduced, so every command starts by making sure it is there.
+# MPD (user service, dotfiles/mpd/mpd.conf) does the playing, so music never
+# depends on a window being open. Cadence (~/Projects/cadence, `make install`)
+# is the front-end. It lives on the special:music scratchpad, same shape as
+# bin/mail for Relay: Super+M shows or hides it over your work with the
+# search box focused, Super+Shift+M pulls it onto this workspace as a tile.
+#
+# The bar's controls call this too, so they work with or without Cadence.
 set -euo pipefail
 
-DEST=org.mpris.MediaPlayer2.tauon
-OBJ=/org/mpris/MediaPlayer2
-IFACE=org.mpris.MediaPlayer2.Player
+APP_BIN=cadence
+CLASS='^(app\.cadence\.Cadence)$'
+CONTROL="${XDG_RUNTIME_DIR:-/tmp}/cadence.control"
 
-running() { busctl --user list 2>/dev/null | grep -q "$DEST"; }
+running() { pgrep -x cadence >/dev/null 2>&1; }
 
-# Start Tauon if its bus name is absent and wait for it to appear. Returns
-# non-zero rather than hanging if it never does.
+# Start Cadence if it is not running, and wait for its control pipe.
 ensure() {
     running && return 0
-    setsid tauon >/dev/null 2>&1 &
-    for _ in $(seq 1 30); do
-        sleep 0.5
-        running && return 0
+    command -v "$APP_BIN" >/dev/null || { echo "music: cadence is not installed (cd ~/Projects/cadence && make install)" >&2; return 1; }
+    setsid "$APP_BIN" >/dev/null 2>&1 &
+    for _ in $(seq 1 40); do
+        sleep 0.25
+        running && [ -p "$CONTROL" ] && return 0
     done
-    echo "music: tauon did not appear on the bus" >&2
+    echo "music: cadence did not start" >&2
     return 1
 }
 
-call() { timeout 6 busctl --user call "$DEST" "$OBJ" "$IFACE" "$@" >/dev/null; }
-get()  { timeout 6 busctl --user get-property "$DEST" "$OBJ" "$IFACE" "$1" 2>/dev/null; }
+# Tell Cadence something over its control pipe (`search`, `quit`). A pipe
+# with no reader would block, hence the timeout.
+tell() { [ -p "$CONTROL" ] && timeout 1 sh -c "echo '$1' > '$CONTROL'" 2>/dev/null || true; }
 
-status() { get PlaybackStatus | sed 's/^s "//; s/"$//'; }
+# Cadence's window address, empty until the window exists.
+addr() { hyprctl clients -j 2>/dev/null | jq -r 'first(.[] | select(.class == "app.cadence.Cadence")) | .address // empty'; }
+wait_addr() {
+    local a
+    for _ in $(seq 1 40); do
+        a=$(addr); [ -n "$a" ] && { echo "$a"; return 0; }
+        sleep 0.25
+    done
+    return 1
+}
+ws_of() { hyprctl clients -j 2>/dev/null | jq -r --arg a "$1" '.[] | select(.address == $a) | .workspace.name'; }
+shown() { hyprctl monitors -j 2>/dev/null | jq -r 'first(.[] | select(.focused)) | .specialWorkspace.name // ""'; }
+
+# Back onto the scratchpad the way the window rule first placed it (after
+# `pane` pulled it out: the rule only runs when a window opens).
+park() {
+    local a=$1
+    [ "$(ws_of "$a")" = "special:music" ] && return 0
+    hyprctl dispatch "hl.dsp.window.move({ window = \"address:$a\", workspace = \"special:music\", follow = false })" >/dev/null 2>&1 || true
+    hyprctl dispatch "hl.dsp.window.float({ window = \"address:$a\", action = \"enable\" })" >/dev/null 2>&1 || true
+    hyprctl dispatch "hl.dsp.window.resize({ window = \"address:$a\", x = 1400, y = 900, relative = false })" >/dev/null 2>&1 || true
+    read -r mw mh < <(hyprctl monitors -j | jq -r 'first(.[] | select(.focused)) | "\(.width/.scale|floor) \(.height/.scale|floor)"')
+    hyprctl dispatch "hl.dsp.window.move({ window = \"address:$a\", x = $(( (mw-1400)/2 )), y = $(( (mh-900)/2 )), relative = false })" >/dev/null 2>&1 || true
+}
+
+# Nothing queued: the whole library, shuffled. Otherwise play what is there.
+start_playing() {
+    if [ "$(mpc playlist | wc -l)" -eq 0 ]; then
+        mpc -q add /
+        mpc -q random on
+    fi
+    mpc -q play
+}
 
 case "${1:-}" in
-    ensure)  ensure ;;
-    status)  running && status || echo "Offline" ;;
+    ensure) ensure ;;
 
-    # Plays immediately AND appends to Tauon's playlist. There is no way to
-    # enqueue without playing, which is why the bar feeds one track at a time
-    # rather than seeding a queue up front.
-    play)
-        [ -n "${2:-}" ] || { echo "usage: music play <file>" >&2; exit 2; }
+    # Super+M: show it over your work with the search box focused, or hide it.
+    window)
         ensure
-        call OpenUri v s "file://$2"
-        ;;
-
-    toggle)
-        ensure
-        call PlayPause
-        ;;
-
-    pause) ensure; call Pause ;;
-
-    # Deliberately not MPRIS Next: with a short playlist that is the call that
-    # crashed Tauon during testing. The bar supplies the next track itself.
-    shuffle-on)  ensure; timeout 6 busctl --user set-property "$DEST" "$OBJ" "$IFACE" Shuffle b true ;;
-    shuffle-off) ensure; timeout 6 busctl --user set-property "$DEST" "$OBJ" "$IFACE" Shuffle b false ;;
-
-    # Show or hide Tauon over whatever you are doing. It lives on the
-    # special:music scratchpad, so this never leaves the workspace you are on
-    # and never stops playback. Launching it first matters: toggling an empty
-    # scratchpad just flashes a blank overlay.
-    window|raise)
-        ensure
-        if command -v hyprctl >/dev/null; then
+        command -v hyprctl >/dev/null || exit 0
+        a=$(wait_addr || true); [ -n "$a" ] && park "$a"
+        if [ "$(shown)" = "special:music" ]; then
             hyprctl dispatch 'hl.dsp.workspace.toggle_special("music")' >/dev/null 2>&1 || true
         else
-            timeout 6 busctl --user call "$DEST" "$OBJ" org.mpris.MediaPlayer2 Raise >/dev/null || true
+            hyprctl dispatch 'hl.dsp.workspace.toggle_special("music")' >/dev/null 2>&1 || true
+            hyprctl dispatch "hl.dsp.focus({ window = [[class:$CLASS]] })" >/dev/null 2>&1 || true
+            tell search
         fi
+        ;;
+
+    # Always into view, never hidden: the launcher entry uses this.
+    show)
+        ensure
+        command -v hyprctl >/dev/null || exit 0
+        a=$(wait_addr || true); [ -n "$a" ] && park "$a"
+        [ "$(shown)" = "special:music" ] || hyprctl dispatch 'hl.dsp.workspace.toggle_special("music")' >/dev/null 2>&1 || true
+        hyprctl dispatch "hl.dsp.focus({ window = [[class:$CLASS]] })" >/dev/null 2>&1 || true
+        tell search
+        ;;
+
+    # Super+Shift+M: Cadence as an ordinary tile on this workspace. Super+M
+    # puts it back on the scratchpad. Already a tile somewhere: go to it.
+    pane)
+        ensure
+        command -v hyprctl >/dev/null || exit 0
+        a=$(wait_addr) || { echo "music: no cadence window" >&2; exit 1; }
+        if [ "$(ws_of "$a")" = "special:music" ]; then
+            [ "$(shown)" = "special:music" ] && hyprctl dispatch 'hl.dsp.workspace.toggle_special("music")' >/dev/null 2>&1
+            ws=$(hyprctl activeworkspace -j | jq -r .id)
+            hyprctl dispatch "hl.dsp.window.move({ window = \"address:$a\", workspace = \"$ws\", follow = false })" >/dev/null 2>&1 || true
+            hyprctl dispatch "hl.dsp.window.float({ window = \"address:$a\", action = \"disable\" })" >/dev/null 2>&1 || true
+        fi
+        hyprctl dispatch "hl.dsp.focus({ window = \"address:$a\" })" >/dev/null 2>&1 || true
+        ;;
+
+    # The bar and Super+Shift+P: play/pause; with nothing queued, shuffle all.
+    toggle)
+        case "$(mpc status 2>/dev/null | sed -n 2p)" in
+            \[playing\]*) mpc -q pause ;;
+            \[paused\]*)  mpc -q play ;;
+            *)            start_playing ;;
+        esac
+        ;;
+
+    pause) mpc -q pause ;;
+    next)  mpc -q next ;;
+
+    status)
+        case "$(mpc status 2>/dev/null | sed -n 2p)" in
+            \[playing\]*) echo Playing ;;
+            \[paused\]*)  echo Paused ;;
+            *) mpc status >/dev/null 2>&1 && echo Stopped || echo Offline ;;
+        esac
         ;;
 
     *)
         cat <<'EOF'
 usage: music <command>
 
-  ensure           start Tauon if it is not already on the bus
-  status           Playing / Paused / Stopped / Offline
-  play <file>      play that file now
-  toggle           play/pause
-  pause            pause
-  shuffle-on|-off  Tauon's own shuffle flag
-  window           show/hide the Tauon window over your work
-
-The track index is built separately by music-index.
+  window     show/hide Cadence over your work, search focused (Super+M)
+  pane       Cadence as a tile on this workspace (Super+Shift+M)
+  show       bring Cadence into view (never hides) — the launcher uses this
+  ensure     start Cadence if it is not running
+  toggle     play/pause; with nothing queued, shuffle the whole library
+  pause      pause
+  next       next track
+  status     Playing / Paused / Stopped / Offline
 EOF
         exit 2 ;;
 esac

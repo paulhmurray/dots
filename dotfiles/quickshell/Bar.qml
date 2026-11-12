@@ -87,7 +87,7 @@ PanelWindow {
         Repeater {
             // Special workspaces (the music scratchpad) have negative ids and
             // are not places you switch between, so they do not belong in the
-            // list — otherwise showing Tauon adds a "-98" to the bar.
+            // list — otherwise showing Cadence adds a "-98" to the bar.
             model: Hyprland.workspaces.values.filter(w => w.id > 0)
             Hover {
                 required property var modelData
@@ -182,18 +182,17 @@ PanelWindow {
         }
 
         // Left-click: play/pause, or shuffle the whole library when nothing is
-        // going. Right-click: the search panel. Hover stays passive — a panel
-        // that opens on hover cannot hold a search box.
+        // queued. Right-click: Cadence with its search box (same as Super+M).
         Hover {
             id: np
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             label: Music.playing && Music.nowTitle !== ""
                    ? Music.nowTitle + (Music.nowArtist ? "\n" + Music.nowArtist : "")
                      + "\n\nclick: pause   right-click: search"
-                   : "Shuffle " + (Music.ready ? Music.tracks.length + " tracks" : "library")
+                   : "Play (shuffles the library when nothing is queued)"
                      + "\n\nclick: play   right-click: search"
             onClicked: (mouse) => {
-                if (mouse.button === Qt.RightButton) Quickshell.execDetached(["qs", "ipc", "call", "music", "toggle"]);
+                if (mouse.button === Qt.RightButton) Music.search();
                 else Music.toggle();
             }
             Icon {

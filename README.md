@@ -151,10 +151,21 @@ newsboat has already blanked its UI by the time the fetch starts.
 
 ## Music
 
-The bar's play button shuffles the whole library; right-click it (or `Super+M`)
-to search and play anything. `Super+N` skips. `Super+Shift+M` shows and hides
-Tauon itself over whatever you are doing — it lives on a scratchpad, so it never
-takes one of the nine workspaces and never moves you off the one you are on.
+MPD plays (a user service; `dotfiles/mpd/mpd.conf`, music in `~/Music`), so
+music never depends on a window. mpd-mpris puts it on MPRIS, so media keys and
+the bar see it.
+
+Cadence is the window: a Flutter front-end with Relay's look and keys, built
+from `~/Projects/cadence` (`make install`, not packaged). `Super+M` shows or
+hides it over whatever you are doing with the search box focused;
+`Super+Shift+M` pulls it onto this workspace as a tile, and `Super+M` puts it
+back. Like Relay it lives on a scratchpad, so it never takes one of the nine
+workspaces. `bin/music` is the shell side: `window`, `pane`, `show`, `toggle`,
+`next`, `status`.
+
+The bar's play button plays or pauses; with nothing queued it shuffles the
+whole library. Right-click opens Cadence's search. `Super+Shift+N` skips and
+`Super+Shift+P` plays or pauses.
 
 `bin/music-art` fills in missing album art as `folder.jpg`, matching the name
 the library already uses. It only ever adds — never touches an audio file, skips
@@ -162,11 +173,8 @@ folders that already have art, and `music-art --undo` removes everything it
 wrote. Compilations, bootlegs and "Unknown Album" folders are deliberately left
 alone: a confidently wrong cover is worse than none.
 
-Tauon exposes no MPRIS TrackList or Playlists interface, so it cannot be told
-"play my library". `bin/music-index` reads tags with mutagen into
-`~/.cache/dots/music.json` (a few seconds for ~2900 tracks) and the bar plays
-one track at a time over MPRIS `OpenUri`, handing over just before each track
-ends. Re-run `music-index` after adding music.
+Cadence uses those `folder.jpg` files directly, and falls back to art embedded
+in the files (fetched once through MPD and cached in `~/.cache/cadence/art`).
 
 ## Layout
 

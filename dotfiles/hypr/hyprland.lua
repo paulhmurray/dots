@@ -79,6 +79,9 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("~/dots/theme/wall.sh")
     -- Relay syncs and reminds only while open; the mail-home rule hides it.
     hl.exec_cmd("mail ensure")
+    -- Cadence starts hidden too, so Super+M shows it instantly. MPD plays
+    -- whether or not it is open; this is only for speed.
+    hl.exec_cmd("music ensure")
 end)
 
 ----------------------------------------------------------------------------
@@ -147,13 +150,15 @@ bind(mod .. " + D",         run("qs ipc call dashboard toggle"), "Dashboard — 
 -- one of the nine numbered workspaces or moving you off the one you are on.
 -- "silent" opens it without showing it; the bin/* scripts bring it up.
 
--- Tauon, the music player.
+-- Cadence, the music front-end (MPD does the playing). Same treatment as
+-- mail: hidden on its scratchpad until Super+M brings it up.
 hl.window_rule({
-    name  = "tauon-home",
-    match = { class = "^(tauonmb)$" },
+    name  = "music-home",
+    match = { class = [[^(app\.cadence\.Cadence)$]] },
     workspace = "special:music silent",
     float = true,
-    size  = { 1100, 720 },
+    size  = { 1400, 900 },
+    suppress_event = "maximize",
 })
 
 -- The news reader is a terminal program, so the window is a foot instance
@@ -195,10 +200,10 @@ hl.window_rule({
 bind(mod .. " + E",         run("mail window"),              "Email — show or hide it over your work")
 bind(mod .. " + SHIFT + E", run("mail pane"),                "Email — as a tile on this workspace")
 bind(mod .. " + O",         run("tiller-window"),            "Tiller — journal, notes and goals over your work")
-bind(mod .. " + M",         run("qs ipc call music toggle"), "Search and play from the music library")
-bind(mod .. " + SHIFT + M", run("music window"),             "Show or hide the music player")
+bind(mod .. " + M",         run("music window"),             "Music — search and play, over your work")
+bind(mod .. " + SHIFT + M", run("music pane"),               "Music — as a tile on this workspace")
 bind(mod .. " + N",         run("news window"),              "News reader")
-bind(mod .. " + SHIFT + N", run("qs ipc call music next"),   "Skip to the next shuffled track")
+bind(mod .. " + SHIFT + N", run("music next"),               "Skip to the next track")
 bind(mod .. " + SHIFT + P", run("music toggle"),             "Play or pause the music")
 bind("XF86AudioPlay",       run("playerctl play-pause"),     "Play or pause whatever is playing", { locked = true })
 bind("XF86AudioNext",       run("playerctl next"),           "Next track in the running player",  { locked = true })

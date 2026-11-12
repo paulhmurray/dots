@@ -127,15 +127,6 @@ for b in "$DOTS"/bin/*; do
     echo "    linked $(basename "$b")"
 done
 
-echo "==> Music index"
-# Guarded: a fresh machine may have no library yet, and an empty index is not
-# a reason to fail an install.
-if [ -d "$HOME/Music" ]; then
-    "$DOTS/bin/music-index" || echo "    index failed — run music-index by hand"
-else
-    echo "    no ~/Music yet, skipping"
-fi
-
 echo "==> Desktop entries"
 # Overrides for launcher entries, e.g. routing Relay through `mail show`
 # so picking it from the launcher brings the scratchpad into view instead of
